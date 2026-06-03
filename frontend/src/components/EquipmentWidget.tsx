@@ -78,18 +78,21 @@ const EquipmentWidget: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<Category | 'Toutes'>('Toutes');
   const [saving, setSaving] = useState(false);
 
+  const fetchEquipment = async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const res = await axios.get('/api/equipment');
+      setItems(res.data);
+    } catch {
+      setFetchError('Impossible de charger la liste d\'équipement');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetch = async () => {
-      try {
-        const res = await axios.get('/api/equipment');
-        setItems(res.data);
-      } catch {
-        console.error('Erreur chargement équipement');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetch();
+    fetchEquipment();
   }, []);
 
   const resetForm = () => {
@@ -282,7 +285,19 @@ const EquipmentWidget: React.FC = () => {
         </div>
       )}
 
-      {!loading && (
+      {fetchError && !loading && (
+        <div className="flex items-center gap-3 p-3 bg-red-900/20 border border-red-700/40 rounded-lg mb-3">
+          <span className="text-red-400 text-sm flex-1">{fetchError}</span>
+          <button
+            className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors"
+            onClick={fetchEquipment}
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
+
+      {!loading && !fetchError && (
         <div className="space-y-2 overflow-y-auto max-h-80">
           {filtered.length === 0 && (
             <div className="text-center py-6 text-gray-500">
