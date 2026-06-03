@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Target } from 'lucide-react';
 import { useUnits } from '../contexts/UnitContext';
+import { useSiteAdjustment, getSiteMultipliers } from '../contexts/SiteAdjustmentContext';
 
 /**
  * CONFIGURATION DU SCORING — modifier ici pour ajuster les seuils
@@ -121,11 +122,12 @@ function computeDivability(
   currentMs: number,
   formatWind: (kt: number) => string = (kt) => `${Math.round(kt)} kt`,
   formatTemp: (c: number) => string = (c) => `${Math.round(c)}°C`,
+  multipliers: { wind: number; swell: number; current: number } = { wind: 1, swell: 1, current: 1 },
 ): DivabilityScore {
   const cfg = DIVABILITY_CONFIG;
 
-  const windScore = scoreFromThresholds(windKnots, cfg.wind.thresholds);
-  const waveScore = scoreFromThresholds(waveHeight, cfg.waves.thresholds);
+  const windScore = scoreFromThresholds(windKnots / multipliers.wind, cfg.wind.thresholds);
+  const waveScore = scoreFromThresholds(waveHeight / multipliers.swell, cfg.waves.thresholds);
   const clarityScore = scoreFromThresholds(precipitation, cfg.clarity.thresholds);
 
   let tempScore = cfg.temperature.fallback;
@@ -134,7 +136,7 @@ function computeDivability(
   else if (seaTemp >= 10) tempScore = 6;
   else if (seaTemp >= 8) tempScore = 4;
 
-  const currentScore = scoreFromThresholds(currentMs, cfg.current.thresholds);
+  const currentScore = scoreFromThresholds(currentMs / multipliers.current, cfg.current.thresholds);
 
   const total = windScore + waveScore + clarityScore + tempScore + currentScore;
 
@@ -166,6 +168,8 @@ interface Props {
 
 const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
   const { formatWind, formatTemp } = useUnits();
+  const { selectedSite } = useSiteAdjustment();
+  const multipliers = getSiteMultipliers(selectedSite);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [tidalImpact, setTidalImpact] = useState<TidalImpact | null>(null);
   const [loading, setLoading] = useState(true);
@@ -235,9 +239,9 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
       currentMs = weather.marine.hourly.ocean_current_velocity[i] || 0;
     }
 
-    const computed = computeDivability(windKnots, waveHeight, precipitation, seaTemp, currentMs, formatWind, formatTemp);
+    const computed = computeDivability(windKnots, waveHeight, precipitation, seaTemp, currentMs, formatWind, formatTemp, multipliers);
     setScore(computed);
-  }, [weather, tidalImpact, selectedDate]);
+  }, [weather, tidalImpact, selectedDate, multipliers.wind, multipliers.swell, multipliers.current]);
 
   const gaugePercentage = score ? score.total : 0;
   const circumference = 2 * Math.PI * 54;
@@ -308,11 +312,14 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
 
           {/* Verdict badge */}
           <div
-            className="px-6 py-2 rounded-full text-lg font-bold mb-5"
+            className="px-6 py-2 rounded-full text-lg font-bold mb-2"
             style={{ backgroundColor: score.verdictColor + '33', color: score.verdictColor, border: `1px solid ${score.verdictColor}55` }}
           >
             {score.verdict}
           </div>
+          {selectedSite && (
+            <p className="text-xs text-ocean-400/70 mb-3 italic">Ajusté pour {selectedSite.name}</p>
+          )}
 
           {/* Score breakdown */}
           <div className="w-full space-y-2">

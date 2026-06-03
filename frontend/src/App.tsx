@@ -6,7 +6,10 @@ import TidesWidget from './components/TidesWidget';
 import ClubDivesWidget from './components/ClubDivesWidget';
 import EquipmentWidget from './components/EquipmentWidget';
 import DiveDecisionBanner from './components/DiveDecisionBanner';
+import DiveSitesWidget from './components/DiveSitesWidget';
 import { UnitProvider } from './contexts/UnitContext';
+import { SiteAdjustmentProvider } from './contexts/SiteAdjustmentContext';
+import { useDiveSites } from './hooks/useDiveSites';
 import UnitSelector from './components/UnitSelector';
 
 interface TideExtreme {
@@ -43,7 +46,8 @@ function getCoefficientColor(coeff: number): string {
   return '#ef4444';
 }
 
-const App: React.FC = () => {
+const AppInner: React.FC = () => {
+  const { selectedSite } = useDiveSites();
   const [currentTime, setCurrentTime] = React.useState(new Date());
   const [tideData, setTideData] = React.useState<DayTides[]>([]);
   const [tidesLoading, setTidesLoading] = React.useState(true);
@@ -78,7 +82,7 @@ const App: React.FC = () => {
   const selectedDate = tideData[selectedDay]?.date ?? '';
 
   return (
-    <UnitProvider>
+    <SiteAdjustmentProvider selectedSite={selectedSite}>
     <div className="min-h-screen">
       {/* Header */}
       <header className="border-b border-navy-700 bg-navy-800/50 backdrop-blur-sm sticky top-0 z-10">
@@ -161,10 +165,11 @@ const App: React.FC = () => {
           <TidesWidget selectedDay={selectedDay} tideData={tideData} tidesLoading={tidesLoading} tidesError={tidesError} onRetry={fetchTides} />
         </div>
 
-        {/* Bottom row: Club + Equipment */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Bottom row: Club + Equipment + DiveSites */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <ClubDivesWidget />
           <EquipmentWidget />
+          <DiveSitesWidget />
         </div>
       </main>
 
@@ -172,8 +177,14 @@ const App: React.FC = () => {
         Dashboard Plongée — Ouistreham, Normandie &nbsp;•&nbsp; Données: Open-Meteo, prédiction harmonique SHOM
       </footer>
     </div>
-    </UnitProvider>
+    </SiteAdjustmentProvider>
   );
 };
+
+const App: React.FC = () => (
+  <UnitProvider>
+    <AppInner />
+  </UnitProvider>
+);
 
 export default App;
