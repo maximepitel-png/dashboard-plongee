@@ -48,9 +48,12 @@ interface Props {
   weather: WeatherData | null;
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+// ─── Constants ─────────────────────────────────────────────────────────────────
 
 const TZ = 'Europe/Paris';
+const FRACTIONS = [1, 2, 3, 3, 2, 1] as const;
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatTime(isoStr: string): string {
   return new Date(isoStr).toLocaleTimeString('fr-FR', {
@@ -77,6 +80,26 @@ function getCoefficientColor(coeff: number): string {
   return '#ef4444';
 }
 
+/** Convert an ISO time string to fractional hours in Paris local time (0–24) */
+function toLocalHours(isoStr: string): number {
+  const d = new Date(isoStr);
+  const parts = new Intl.DateTimeFormat('fr-FR', {
+    hour: 'numeric',
+    minute: 'numeric',
+    timeZone: TZ,
+  }).formatToParts(d);
+  const h = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10);
+  const m = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+  return h + m / 60;
+}
+
+/** Format fractional-hour as HH:MM */
+function hoursToHHMM(h: number): string {
+  const hh = Math.floor(h) % 24;
+  const mm = Math.round((h - Math.floor(h)) * 60);
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
 /** Moon phase from a date string (YYYY-MM-DD) */
 function getMoonPhase(dateStr: string): { emoji: string; label: string } {
   const date = new Date(dateStr + 'T12:00:00Z');
@@ -95,27 +118,7 @@ function getMoonPhase(dateStr: string): { emoji: string; label: string } {
   return { emoji: '🌘', label: 'Dernier croissant' };
 }
 
-/** Convert an ISO time string to fractional hours in Paris local time (0–24) */
-function toLocalHours(isoStr: string): number {
-  const d = new Date(isoStr);
-  const parts = new Intl.DateTimeFormat('fr-FR', {
-    hour: 'numeric',
-    minute: 'numeric',
-    timeZone: TZ,
-  }).formatToParts(d);
-  const h = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10);
-  const m = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10);
-  return h + m / 60;
-}
-
-/** Format fractional-hour as HH:MM Paris-local */
-function hoursToHHMM(h: number): string {
-  const hh = Math.floor(h) % 24;
-  const mm = Math.round((h - Math.floor(h)) * 60);
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-}
-
-// ─── Custom Tooltip ────────────────────────────────────────────────────────────
+// ─── Custom Chart Tooltip ──────────────────────────────────────────────────────
 
 interface TooltipPayload {
   value?: number;
@@ -130,28 +133,25 @@ const CustomTooltip: React.FC<{ active?: boolean; payload?: TooltipPayload[] }> 
   const pt = payload[0];
   const time = pt.payload?.time;
   return (
-    <div className="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-xs">
+    <div className="bg-navy-800 border border-navy-600 rounded-lg px-3 py-2 text-xs shadow-xl">
       {time && <p className="text-gray-400 mb-1">{formatTime(time)}</p>}
       <p className="text-ocean-400 font-bold">{pt.value?.toFixed(2)} m</p>
     </div>
   );
 };
 
-// ─── Règle des douzièmes sub-component ────────────────────────────────────────
+// ─── Règle des douzièmes ───────────────────────────────────────────────────────
 
 interface TwelfthsProps {
   from: TideExtreme;
   to: TideExtreme;
 }
 
-const FRACTIONS = [1, 2, 3, 3, 2, 1] as const;
-
 const RuleOfTwelfths: React.FC<TwelfthsProps> = ({ from, to }) => {
   const marnage = Math.abs(to.height - from.height);
   const isFlot = to.type === 'high';
   const label = isFlot ? 'Flot (montant)' : 'Jusant (descendant)';
   const accentColor = isFlot ? '#00b4d8' : '#6b7280';
-
   const totalMs = new Date(to.time).getTime() - new Date(from.time).getTime();
   const hourDuration = totalMs / 6;
 
@@ -162,7 +162,7 @@ const RuleOfTwelfths: React.FC<TwelfthsProps> = ({ from, to }) => {
         <InfoTooltip text="La règle des douzièmes estime la variation de hauteur heure par heure entre deux étales. La mer monte/descend de 1/12, 2/12, 3/12, 3/12, 2/12, 1/12 du marnage total à chaque heure successive." />
         <span className="ml-1 text-gray-600 font-normal normal-case">{label}</span>
       </p>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {FRACTIONS.map((frac, i) => {
           const meters = (frac / 12) * marnage;
           const widthPct = (frac / 3) * 100; // 3/12 is max → 100%
@@ -170,31 +170,42 @@ const RuleOfTwelfths: React.FC<TwelfthsProps> = ({ from, to }) => {
           const hourEnd = new Date(new Date(from.time).getTime() + (i + 1) * hourDuration);
           const isFast = frac === 3;
           const isSlack = i === 0 || i === 5;
+          const hourLabel = `H${i + 1} +${frac}/12`;
           return (
             <div key={i} className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 w-24 shrink-0">
+              {/* Hour label */}
+              <span className="text-[10px] text-gray-500 w-12 shrink-0 font-mono">{hourLabel}</span>
+              {/* Time range */}
+              <span className="text-[10px] text-gray-600 w-20 shrink-0 hidden sm:inline">
                 {formatTime(hourStart.toISOString())}–{formatTime(hourEnd.toISOString())}
               </span>
-              <div className="flex-1 bg-navy-900 rounded-full h-4 overflow-hidden relative">
+              {/* Bar */}
+              <div className="flex-1 bg-navy-900 rounded-full h-3.5 overflow-hidden">
                 <div
-                  className="h-full rounded-full transition-all"
+                  className="h-full rounded-full transition-all duration-300"
                   style={{
                     width: `${widthPct}%`,
-                    backgroundColor: isFast ? '#ef4444' : isSlack ? '#6b7280' : accentColor,
+                    backgroundColor: isFast ? '#ef4444' : isSlack ? '#4b5563' : accentColor,
                     opacity: 0.85,
                   }}
                 />
               </div>
-              <span className="text-xs font-mono w-12 shrink-0" style={{ color: accentColor }}>
-                {isFlot ? '+' : '−'}{meters.toFixed(2)}m
+              {/* Meters */}
+              <span
+                className="text-[10px] font-mono w-12 shrink-0 text-right"
+                style={{ color: accentColor }}
+              >
+                {isFlot ? '+' : '−'}
+                {meters.toFixed(2)}m
               </span>
-              <span className="text-xs w-28 shrink-0">
+              {/* Pill label */}
+              <span className="w-28 shrink-0">
                 {isFast ? (
-                  <span className="bg-red-900/40 text-red-300 px-1.5 py-0.5 rounded-full text-[10px]">
+                  <span className="bg-red-900/40 text-red-300 px-1.5 py-0.5 rounded-full text-[10px] whitespace-nowrap">
                     Courant max
                   </span>
                 ) : isSlack ? (
-                  <span className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded-full text-[10px]">
+                  <span className="bg-gray-700/60 text-gray-400 px-1.5 py-0.5 rounded-full text-[10px] whitespace-nowrap">
                     Étale proche
                   </span>
                 ) : null}
@@ -203,8 +214,9 @@ const RuleOfTwelfths: React.FC<TwelfthsProps> = ({ from, to }) => {
           );
         })}
       </div>
-      <p className="text-xs text-gray-600 mt-1">
-        Marnage : {marnage.toFixed(2)} m · {formatTime(from.time)} → {formatTime(to.time)} ({formatDuration(totalMs)})
+      <p className="text-[10px] text-gray-600 mt-2">
+        Marnage : {marnage.toFixed(2)} m · {formatTime(from.time)} → {formatTime(to.time)} (
+        {formatDuration(totalMs)})
       </p>
     </div>
   );
@@ -225,7 +237,7 @@ const TidesWidget: React.FC<Props> = ({
   const currentDay = tideData[selectedDay];
   const nowMs = Date.now();
 
-  // ── Current height (today only) ──
+  // ── Current height (today only) ──────────────────────────────────────────────
   const currentHeight = useMemo(() => {
     if (!currentDay?.points?.length) return null;
     return currentDay.points.reduce((prev, pt) =>
@@ -237,7 +249,7 @@ const TidesWidget: React.FC<Props> = ({
     );
   }, [currentDay, nowMs]);
 
-  // ── Chart data ──
+  // ── Chart data ───────────────────────────────────────────────────────────────
   const chartData = useMemo(
     () =>
       currentDay?.points?.map((p) => ({
@@ -248,10 +260,10 @@ const TidesWidget: React.FC<Props> = ({
     [currentDay]
   );
 
-  // Every other point for performance
+  // Thin every other point for performance without losing shape
   const thinChartData = useMemo(() => chartData.filter((_, i) => i % 2 === 0), [chartData]);
 
-  // ── "Maintenant" x-value ──
+  // ── "Maintenant" x-value ─────────────────────────────────────────────────────
   const nowLocalHour = useMemo(() => {
     const d = new Date();
     const parts = new Intl.DateTimeFormat('fr-FR', {
@@ -264,7 +276,7 @@ const TidesWidget: React.FC<Props> = ({
     return h + m / 60;
   }, []);
 
-  // ── Threshold windows ──
+  // ── Threshold windows ────────────────────────────────────────────────────────
   const thresholdWindows = useMemo(() => {
     if (!currentDay?.points?.length) return null;
     const above = currentDay.points.filter((p) => p.height >= thresholdHeight);
@@ -280,7 +292,7 @@ const TidesWidget: React.FC<Props> = ({
     };
   }, [currentDay, thresholdHeight]);
 
-  // ── Sunrise / Sunset ──
+  // ── Sunrise / Sunset ─────────────────────────────────────────────────────────
   const sunTimes = useMemo(() => {
     if (!weather?.daily) return null;
     const rise = weather.daily.sunrise?.[selectedDay];
@@ -293,20 +305,18 @@ const TidesWidget: React.FC<Props> = ({
     };
   }, [weather, selectedDay]);
 
-  // ── Moon phase ──
+  // ── Moon phase ───────────────────────────────────────────────────────────────
   const moonPhase = useMemo(
     () => (currentDay ? getMoonPhase(currentDay.date) : null),
     [currentDay]
   );
 
-  // ── Règle des douzièmes: pick the next ongoing pair or first pair ──
+  // ── Règle des douzièmes: ongoing pair or first pair ──────────────────────────
   const twelfthsPair = useMemo((): { from: TideExtreme; to: TideExtreme } | null => {
-    if (!currentDay?.extremes?.length) return null;
+    if (!currentDay?.extremes?.length || currentDay.extremes.length < 2) return null;
     const exts = currentDay.extremes;
-    if (exts.length < 2) return null;
 
     if (selectedDay === 0) {
-      // Find the pair that straddles now
       for (let i = 0; i < exts.length - 1; i++) {
         const fromMs = new Date(exts[i].time).getTime();
         const toMs = new Date(exts[i + 1].time).getTime();
@@ -321,12 +331,12 @@ const TidesWidget: React.FC<Props> = ({
     return { from: exts[0], to: exts[1] };
   }, [currentDay, selectedDay, nowMs]);
 
-  // ── Étale windows for chart (±45 min around each extreme) ──
+  // ── Étale windows for chart (±45 min around each extreme) ───────────────────
   const etaleAreas = useMemo(() => {
     if (!currentDay?.extremes) return [];
     return currentDay.extremes.map((ext, i) => {
       const center = toLocalHours(ext.time);
-      const isBest = i === 0; // first étale = highlight
+      const isBest = i === 0;
       return {
         x1: center - 0.75,
         x2: center + 0.75,
@@ -336,7 +346,7 @@ const TidesWidget: React.FC<Props> = ({
     });
   }, [currentDay]);
 
-  // ── Tidal table rows ──
+  // ── Tidal table rows ─────────────────────────────────────────────────────────
   const tableRows = useMemo(() => {
     if (!currentDay?.extremes) return [];
     return currentDay.extremes.map((ext, i) => {
@@ -349,11 +359,11 @@ const TidesWidget: React.FC<Props> = ({
     });
   }, [currentDay]);
 
-  // ─── Render ────────────────────────────────────────────────────────────────
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="card">
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="card-header">
         <Waves size={18} className="text-ocean-400" />
         <span>Marées — Ouistreham</span>
@@ -362,7 +372,7 @@ const TidesWidget: React.FC<Props> = ({
             className="ml-auto text-sm font-normal"
             style={{ color: getCoefficientColor(currentDay.coefficient) }}
           >
-            Coeff. ~{currentDay.coefficient}
+            Coeff.&nbsp;~{currentDay.coefficient}
             {currentDay.coefficient <= 70 && (
               <span className="text-gray-500 text-xs ml-1">morte-eau</span>
             )}
@@ -373,14 +383,14 @@ const TidesWidget: React.FC<Props> = ({
         )}
       </div>
 
-      {/* Loading */}
+      {/* ── Loading ── */}
       {tidesLoading && (
         <div className="flex items-center justify-center h-40 text-gray-500 animate-pulse">
           Calcul des marées…
         </div>
       )}
 
-      {/* Error */}
+      {/* ── Error ── */}
       {tidesError && !tidesLoading && (
         <div className="flex items-center gap-3 p-3 bg-red-900/20 border border-red-700/40 rounded-lg mb-3">
           <span className="text-red-400 text-sm flex-1">{tidesError}</span>
@@ -393,7 +403,7 @@ const TidesWidget: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Empty */}
+      {/* ── Empty ── */}
       {!tidesLoading && !tidesError && tideData.length === 0 && (
         <div className="text-center py-8 text-gray-500">
           <Waves size={32} className="mx-auto mb-2 text-gray-600" />
@@ -401,13 +411,13 @@ const TidesWidget: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Main content */}
+      {/* ── Main content ── */}
       {!tidesLoading && !tidesError && currentDay && (
         <>
           {/* ── Current height pill (today only) ── */}
           {selectedDay === 0 && currentHeight && (
             <div className="flex items-center gap-3 mb-4 bg-navy-900 rounded-lg p-3">
-              <Waves size={24} className="text-ocean-400" />
+              <Waves size={22} className="text-ocean-400 shrink-0" />
               <div>
                 <p className="text-xl font-bold text-ocean-400">
                   {currentHeight.height.toFixed(2)} m
@@ -426,7 +436,9 @@ const TidesWidget: React.FC<Props> = ({
             </div>
           )}
 
-          {/* ── Section 1: Tableau des marées ── */}
+          {/* ─────────────────────────────────────────────────────────────────── */}
+          {/* Section 1 — Tableau des marées                                      */}
+          {/* ─────────────────────────────────────────────────────────────────── */}
           <p className="text-xs uppercase tracking-wide text-gray-500 mb-2 flex items-center gap-1">
             Tableau des marées
             <InfoTooltip text="PM = Pleine Mer (haute mer), BM = Basse Mer. Le marnage est la différence de hauteur entre deux étales consécutives. La durée indique le temps entre chaque étale." />
@@ -460,14 +472,16 @@ const TidesWidget: React.FC<Props> = ({
                         )}
                         <span
                           className={
-                            ext.type === 'high' ? 'text-ocean-300 font-semibold' : 'text-gray-400'
+                            ext.type === 'high'
+                              ? 'text-ocean-300 font-semibold'
+                              : 'text-gray-400'
                           }
                         >
                           {ext.type === 'high' ? 'PM' : 'BM'}
                         </span>
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-300">
+                    <td className="px-3 py-2 text-right text-gray-300 font-mono">
                       {formatTime(ext.time)}
                     </td>
                     <td className="px-3 py-2 text-right font-mono font-bold text-white">
@@ -490,7 +504,9 @@ const TidesWidget: React.FC<Props> = ({
             </table>
           </div>
 
-          {/* ── Section 4: Marégramme ── */}
+          {/* ─────────────────────────────────────────────────────────────────── */}
+          {/* Section 4 — Marégramme                                              */}
+          {/* ─────────────────────────────────────────────────────────────────── */}
           <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Marégramme</p>
           <div className="h-52 mb-1">
             <ResponsiveContainer width="100%" height="100%">
@@ -507,7 +523,7 @@ const TidesWidget: React.FC<Props> = ({
                   type="number"
                   domain={[0, 24]}
                   ticks={[0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24]}
-                  tickFormatter={(v) => `${String(v).padStart(2, '0')}h`}
+                  tickFormatter={(v: number) => `${String(v).padStart(2, '0')}h`}
                   tick={{ fill: '#6b7280', fontSize: 10 }}
                   axisLine={{ stroke: '#0f2d4a' }}
                   tickLine={false}
@@ -519,11 +535,11 @@ const TidesWidget: React.FC<Props> = ({
                   axisLine={false}
                   tickLine={false}
                   width={30}
-                  tickFormatter={(v) => `${v}m`}
+                  tickFormatter={(v: number) => `${v}m`}
                 />
                 <Tooltip content={<CustomTooltip />} />
 
-                {/* Étale windows */}
+                {/* Étale windows ±45 min */}
                 {etaleAreas.map((area, i) => (
                   <ReferenceArea
                     key={`etale-${i}`}
@@ -535,7 +551,7 @@ const TidesWidget: React.FC<Props> = ({
                   />
                 ))}
 
-                {/* Sunrise / Sunset lines */}
+                {/* Sunrise line */}
                 {sunTimes?.riseHour != null && (
                   <ReferenceLine
                     x={sunTimes.riseHour}
@@ -545,6 +561,8 @@ const TidesWidget: React.FC<Props> = ({
                     label={{ value: '☀️', position: 'top', fontSize: 11 }}
                   />
                 )}
+
+                {/* Sunset line */}
                 {sunTimes?.setHour != null && (
                   <ReferenceLine
                     x={sunTimes.setHour}
@@ -572,7 +590,7 @@ const TidesWidget: React.FC<Props> = ({
                   />
                 ))}
 
-                {/* Threshold line */}
+                {/* Threshold line (amber dashed) */}
                 <ReferenceLine
                   y={thresholdHeight}
                   stroke="#f59e0b"
@@ -615,7 +633,9 @@ const TidesWidget: React.FC<Props> = ({
             </ResponsiveContainer>
           </div>
 
-          {/* ── Section 3: Seuil de hauteur ── */}
+          {/* ─────────────────────────────────────────────────────────────────── */}
+          {/* Section 3 — Outil seuil de hauteur                                  */}
+          {/* ─────────────────────────────────────────────────────────────────── */}
           <div className="mt-4 bg-navy-900 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs uppercase tracking-wide text-gray-500 flex items-center gap-1">
@@ -653,24 +673,28 @@ const TidesWidget: React.FC<Props> = ({
             )}
           </div>
 
-          {/* ── Section 2: Règle des douzièmes ── */}
+          {/* ─────────────────────────────────────────────────────────────────── */}
+          {/* Section 2 — Règle des douzièmes                                     */}
+          {/* ─────────────────────────────────────────────────────────────────── */}
           {twelfthsPair && (
             <RuleOfTwelfths from={twelfthsPair.from} to={twelfthsPair.to} />
           )}
 
-          {/* ── Section 5: Soleil + Lune ── */}
+          {/* ─────────────────────────────────────────────────────────────────── */}
+          {/* Section 5 — Soleil + Phase de lune                                  */}
+          {/* ─────────────────────────────────────────────────────────────────── */}
           <div className="mt-4 flex items-center justify-between bg-navy-900 rounded-lg px-3 py-2">
             <div className="flex items-center gap-3 text-xs">
               {sunTimes?.rise && (
                 <span className="flex items-center gap-1 text-yellow-400">
                   <Sunrise size={13} />
-                  {sunTimes.rise}
+                  <span>Lever : {sunTimes.rise}</span>
                 </span>
               )}
               {sunTimes?.set && (
                 <span className="flex items-center gap-1 text-orange-400">
                   <Sunset size={13} />
-                  {sunTimes.set}
+                  <span>Coucher : {sunTimes.set}</span>
                 </span>
               )}
               {!sunTimes?.rise && !sunTimes?.set && (
@@ -679,8 +703,8 @@ const TidesWidget: React.FC<Props> = ({
             </div>
             {moonPhase && (
               <span className="text-xs text-gray-400 flex items-center gap-1">
-                <span className="text-base">{moonPhase.emoji}</span>
-                {moonPhase.label}
+                <span className="text-base leading-none">{moonPhase.emoji}</span>
+                <span>{moonPhase.label}</span>
                 {moonPhase.label === 'Pleine lune' && (
                   <span className="ml-1 text-amber-400 text-[10px]">(vives-eaux)</span>
                 )}
@@ -694,7 +718,10 @@ const TidesWidget: React.FC<Props> = ({
               <span className="flex items-center gap-1">
                 Coefficient
                 <InfoTooltip text="Le coefficient de marée (20 à 120) mesure l'amplitude. En dessous de 70 : morte-eau (faibles courants). Au-dessus de 95 : vive-eau (forts courants, grande amplitude)." />
-                : <strong style={{ color: getCoefficientColor(currentDay.coefficient) }}>~{currentDay.coefficient}</strong>
+                :{' '}
+                <strong style={{ color: getCoefficientColor(currentDay.coefficient) }}>
+                  ~{currentDay.coefficient}
+                </strong>
               </span>
               <span>
                 {currentDay.coefficient <= 70
@@ -736,7 +763,7 @@ const TidesWidget: React.FC<Props> = ({
 
       {!tidesLoading && (
         <p className="text-xs text-gray-700 mt-2 pt-2 border-t border-navy-800">
-          ⏰ Heures en heure locale (Europe/Paris) · Source : modèle harmonique SHOM Ouistreham
+          Heures en heure locale (Europe/Paris) · Source : modèle harmonique SHOM Ouistreham
         </p>
       )}
     </div>
