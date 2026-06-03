@@ -28,6 +28,7 @@ interface WeatherData {
     };
   };
   location: { lat: number; lon: number; name: string };
+  isMock?: boolean;
 }
 
 function weatherDescription(code: number): string {
@@ -182,6 +183,16 @@ const WeatherWidget: React.FC = () => {
 
       {error && (
         <div className="text-red-400 text-sm p-3 bg-red-900/20 rounded-lg">{error}</div>
+      )}
+
+      {weather?.isMock && !loading && (
+        <div className="flex items-start gap-2 mb-4 p-3 bg-amber-900/30 border border-amber-600/50 rounded-lg text-amber-300 text-sm">
+          <span className="text-lg leading-none mt-0.5">⚠️</span>
+          <div>
+            <p className="font-semibold">Données de démonstration</p>
+            <p className="text-amber-400/80 text-xs mt-0.5">L'API météo est temporairement indisponible. Les valeurs affichées sont fictives et ne reflètent pas les conditions réelles.</p>
+          </div>
+        </div>
       )}
 
       {weather && !loading && (

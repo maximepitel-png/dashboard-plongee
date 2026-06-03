@@ -44,7 +44,7 @@ interface DivabilityScore {
   tidal: number;
   verdict: string;
   verdictColor: string;
-  details: { label: string; value: string; score: number }[];
+  details: { label: string; value: string; score: number; note?: string }[];
 }
 
 function computeDivability(
@@ -117,7 +117,7 @@ function computeDivability(
     details: [
       { label: 'Vent', value: `${Math.round(windKnots)} kt`, score: windScore },
       { label: 'Vagues', value: `${waveHeight.toFixed(1)} m`, score: waveScore },
-      { label: 'Visibilité', value: precipitation === 0 ? 'Bonne' : `${precipitation.toFixed(1)} mm`, score: visScore },
+      { label: 'Précip. surface', value: precipitation === 0 ? 'Aucune' : `${precipitation.toFixed(1)} mm`, score: visScore, note: 'proxy surface — ≠ visibilité sous-marine' },
       { label: 'Temp. mer', value: `${seaTemp.toFixed(1)}°C`, score: tempScore },
       { label: 'Coeff. marée', value: `${tidalCoeff}`, score: tidalScore },
     ],
@@ -281,18 +281,23 @@ const DivabilityWidget: React.FC = () => {
           {/* Score breakdown */}
           <div className="w-full space-y-2">
             {score.details.map((d) => (
-              <div key={d.label} className="flex items-center gap-2">
-                <span className="text-xs text-gray-400 w-24 shrink-0">{d.label}</span>
-                <div className="flex-1 bg-navy-900 rounded-full h-2">
-                  <div
-                    className="h-2 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${(d.score / 30) * 100}%`,
-                      backgroundColor: d.score >= 20 ? '#22c55e' : d.score >= 10 ? '#f59e0b' : '#ef4444',
-                    }}
-                  />
+              <div key={d.label}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-24 shrink-0">{d.label}</span>
+                  <div className="flex-1 bg-navy-900 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${(d.score / 30) * 100}%`,
+                        backgroundColor: d.score >= 20 ? '#22c55e' : d.score >= 10 ? '#f59e0b' : '#ef4444',
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-300 w-16 text-right shrink-0">{d.value}</span>
                 </div>
-                <span className="text-xs text-gray-300 w-16 text-right shrink-0">{d.value}</span>
+                {d.note && (
+                  <p className="text-xs text-amber-500/70 ml-24 mt-0.5 italic">{d.note}</p>
+                )}
               </div>
             ))}
           </div>
