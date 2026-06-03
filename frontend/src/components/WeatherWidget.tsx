@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import { Wind, Waves, AlertTriangle, Search } from 'lucide-react';
+import React from 'react';
+import { Wind, Waves, AlertTriangle } from 'lucide-react';
 import { useUnits } from '../contexts/UnitContext';
 
 interface WeatherData {
@@ -50,12 +49,12 @@ interface Props {
   onRetry: () => void;
   selectedDay: number;
   location: { lat: number; lon: number; name: string };
-  onLocationChange: (loc: { lat: number; lon: number; name: string }) => void;
 }
 
 // Ouistreham coast faces roughly North (bearing ~0°).
 // Waves coming from N = onshore; from S = offshore.
 const SITE_BEARING = 0;
+
 
 function waveExposure(dirFrom: number): { label: string; color: string } {
   const diff = Math.abs(((dirFrom - SITE_BEARING + 180) % 360) - 180);
@@ -107,8 +106,6 @@ function windDirectionLabel(deg: number): string {
   return dirs[Math.round(deg / 45) % 8];
 }
 
-const DEFAULT_LOCATION = { lat: 49.2796, lon: -0.2602, name: 'Ouistreham' };
-
 const WeatherWidget: React.FC<Props> = ({
   weather,
   weatherLoading,
@@ -116,33 +113,8 @@ const WeatherWidget: React.FC<Props> = ({
   onRetry,
   selectedDay,
   location,
-  onLocationChange,
 }) => {
   const { formatWind, formatTemp } = useUnits();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searching, setSearching] = useState(false);
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    setSearching(true);
-    try {
-      const res = await axios.get(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery)}&count=1&language=fr&format=json`
-      );
-      if (res.data.results && res.data.results.length > 0) {
-        const r = res.data.results[0];
-        onLocationChange({ lat: r.latitude, lon: r.longitude, name: r.name });
-        setSearchQuery('');
-      } else {
-        alert('Lieu non trouvé');
-      }
-    } catch {
-      alert('Erreur de recherche');
-    } finally {
-      setSearching(false);
-    }
-  };
 
   // Get marine data for the selected day
   const getCurrentMarine = () => {
@@ -233,29 +205,6 @@ const WeatherWidget: React.FC<Props> = ({
         <span>Météo Marine</span>
         <span className="ml-auto text-sm font-normal text-gray-400">{location.name}</span>
       </div>
-
-      {/* Search */}
-      <form onSubmit={handleSearch} className="flex gap-2 mb-4">
-        <input
-          type="text"
-          placeholder="Chercher un lieu..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="input flex-1"
-        />
-        <button type="submit" className="btn-primary" disabled={searching}>
-          {searching ? '...' : <Search size={14} />}
-        </button>
-        {location.name !== DEFAULT_LOCATION.name && (
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => onLocationChange(DEFAULT_LOCATION)}
-          >
-            ↩
-          </button>
-        )}
-      </form>
 
       {weatherLoading && (
         <div className="flex items-center justify-center h-32 text-gray-500">

@@ -11,7 +11,7 @@ import { UnitProvider } from './contexts/UnitContext';
 import { SiteAdjustmentProvider } from './contexts/SiteAdjustmentContext';
 import { useDiveSites } from './hooks/useDiveSites';
 import UnitSelector from './components/UnitSelector';
-import { computeDayScore } from './utils/diveScore';
+import { computeDayDivabilityScore } from './utils/divabilityPerDay';
 
 interface TideExtreme {
   time: string;
@@ -52,12 +52,6 @@ function isDayBeyondMarine(date: string, marineHorizonDate: string | null): bool
   return new Date(date + 'T12:00:00') > new Date(marineHorizonDate);
 }
 
-function forecastResolutionLabel(dayIndex: number): string | null {
-  if (dayIndex <= 6) return null;
-  if (dayIndex <= 9) return '~3h';
-  return '~6h';
-}
-
 function getDayWindRange(date: string, weather: any): { min: number; max: number } | null {
   if (!weather?.hourly?.time) return null;
   const dayStr = date;
@@ -84,6 +78,8 @@ const AppInner: React.FC = () => {
   const [weather, setWeather] = React.useState<any>(null);
   const [weatherLoading, setWeatherLoading] = React.useState(true);
   const [weatherError, setWeatherError] = React.useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searching, setSearching] = React.useState(false);
 
   React.useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -126,6 +122,26 @@ const AppInner: React.FC = () => {
     fetchWeather();
   }, [fetchWeather]);
 
+  const handleLocationSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    try {
+      const res = await axios.get(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery)}&count=5&language=fr&format=json`
+      );
+      if (res.data.results && res.data.results.length > 0) {
+        const r = res.data.results[0];
+        setLocation({ lat: r.latitude, lon: r.longitude, name: r.name });
+        setSearchQuery('');
+      }
+    } catch {
+      // silent fail
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const formatDate = (d: Date) =>
     d.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -137,118 +153,176 @@ const AppInner: React.FC = () => {
     <div className="min-h-screen">
       {/* Header */}
       <header className="border-b border-navy-700 bg-navy-800/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🤿</span>
-            <div>
-              <h1 className="text-xl font-bold text-ocean-400 leading-tight">Dashboard Plongée</h1>
-              <p className="text-xs text-gray-400">Ouistreham — Calvados</p>
-            </div>
+        {/* Row 1: branding + location + search + units + clock */}
+        <div className="max-w-screen-2xl mx-auto px-4 py-3 flex items-center gap-4 flex-wrap">
+          {/* Logo */}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-2xl">🤿</span>
+            <span className="text-sm font-bold text-gray-400 hidden sm:block">Dashboard Plongée</span>
           </div>
-          <div className="flex items-center gap-4">
+
+          {/* Location display + search */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00b4d8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              <h1 className="text-lg font-bold text-ocean-400 leading-tight truncate">{location.name}</h1>
+              {weatherLoading && <span className="text-xs text-gray-600 animate-pulse">chargement…</span>}
+            </div>
+            <form onSubmit={handleLocationSearch} className="flex gap-1.5">
+              <input
+                type="text"
+                placeholder="Changer de lieu…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="input flex-1 text-xs py-1 h-7 min-w-0"
+              />
+              <button type="submit" disabled={searching} className="btn-primary text-xs px-2 py-1 h-7 shrink-0">
+                {searching ? '…' : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                )}
+              </button>
+              {location.name !== DEFAULT_LOCATION.name && (
+                <button
+                  type="button"
+                  className="btn-ghost text-xs px-2 py-1 h-7 shrink-0"
+                  onClick={() => { setLocation(DEFAULT_LOCATION); setSearchQuery(''); }}
+                  title="Retour à Ouistreham"
+                >
+                  ↩
+                </button>
+              )}
+            </form>
+          </div>
+
+          {/* Units + clock */}
+          <div className="flex items-center gap-3 shrink-0">
             <UnitSelector />
-            <div className="text-right">
-              <p className="text-sm text-gray-300 capitalize">{formatDate(currentTime)}</p>
-              <p className="text-xs text-gray-500">
+            <div className="text-right hidden md:block">
+              <p className="text-xs text-gray-400 capitalize">{formatDate(currentTime)}</p>
+              <p className="text-xs text-gray-600">
                 {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
           </div>
         </div>
-        {/* Decorative wave */}
+
+        {/* Decorative line */}
         <div className="h-0.5 bg-gradient-to-r from-transparent via-ocean-400 to-transparent opacity-30" />
-      </header>
 
-      {/* Main content */}
-      <main className="max-w-screen-2xl mx-auto px-4 py-6">
-
-        {/* Day selector — unique, partagé par tous les widgets */}
-        <div className="mb-4">
+        {/* Row 2: Rich day bar */}
+        <div className="max-w-screen-2xl mx-auto px-4 py-2">
           {tidesLoading && (
-            <div className="flex gap-1.5 flex-wrap">
-              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="h-10 w-24 rounded-lg bg-navy-800 animate-pulse" />
+            <div className="flex gap-2">
+              {[0,1,2,3,4,5,6].map(i => (
+                <div key={i} className="h-20 w-28 rounded-lg bg-navy-900 animate-pulse shrink-0" />
               ))}
-            </div>
-          )}
-          {tidesError && (
-            <div className="flex items-center gap-3 p-3 bg-red-900/20 border border-red-700/40 rounded-lg">
-              <span className="text-red-400 text-sm">{tidesError}</span>
-              <button
-                className="ml-auto text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors"
-                onClick={fetchTides}
-              >
-                Réessayer
-              </button>
             </div>
           )}
           {!tidesLoading && !tidesError && tideData.length > 0 && (
             <>
-              <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+              <div
+                className="flex gap-2 overflow-x-auto pb-1"
+                style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+              >
                 {tideData.map((d, i) => {
                   const beyondMarine = isDayBeyondMarine(d.date, marineHorizonDate);
                   const windRange = weather ? getDayWindRange(d.date, weather) : null;
-                  const resLabel = forecastResolutionLabel(i);
+                  const isSelected = selectedDay === i;
 
-                  let dotColor: string | null = null;
-                  if (!beyondMarine && weather) {
-                    const ds = computeDayScore(d.extremes, weather, i);
-                    if (ds.quality === 'excellent') dotColor = '#2dd4bf';
-                    else if (ds.quality === 'good') dotColor = '#f59e0b';
-                  }
+                  // Per-day divability score
+                  const dayScore = weather ? computeDayDivabilityScore(d.date, weather, marineHorizonDate) : null;
+
+                  // Air temp at noon
+                  const noonStr = d.date + 'T12';
+                  const noonIdx = weather?.hourly?.time?.findIndex((t: string) => t >= noonStr) ?? -1;
+                  const airTemp = noonIdx >= 0 ? Math.round(weather?.hourly?.temperature_2m?.[noonIdx] ?? 0) : null;
+
+                  const isToday = i === 0;
 
                   return (
                     <button
                       key={d.date}
                       onClick={() => setSelectedDay(i)}
-                      style={{ flexShrink: 0 }}
-                      className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        selectedDay === i ? 'bg-ocean-500 text-white' : 'bg-navy-800 text-gray-400 hover:bg-navy-700'
-                      } ${beyondMarine ? 'opacity-75' : ''}`}
+                      style={{ flexShrink: 0, minWidth: '108px' }}
+                      className={`relative rounded-xl px-3 py-2 text-left transition-all duration-150 ${
+                        isSelected
+                          ? 'bg-ocean-600/40 border border-ocean-400/60 shadow-lg shadow-ocean-900/30'
+                          : 'bg-navy-900/80 border border-navy-700/60 hover:border-navy-500'
+                      } ${beyondMarine ? 'opacity-70' : ''}`}
                     >
-                      <span className="block">{formatDayTab(d.date)}</span>
-                      <span className="block" style={{ color: beyondMarine ? '#6b7280' : getCoefficientColor(d.coefficient) }}>
-                        ~C{d.coefficient}
-                      </span>
+                      {/* Date */}
+                      <p className={`text-xs font-semibold mb-1 ${isSelected ? 'text-ocean-300' : 'text-gray-400'}`}>
+                        {isToday ? "Aujourd'hui" : formatDayTab(d.date)}
+                      </p>
+
+                      {/* Divability score */}
+                      {dayScore ? (
+                        <>
+                          <div className="flex items-baseline gap-1 mb-1">
+                            <span className="text-lg font-bold leading-none" style={{ color: dayScore.verdictColor }}>
+                              {dayScore.score}
+                            </span>
+                            <span className="text-xs text-gray-600">/{dayScore.maxPossible}</span>
+                          </div>
+                          <p className="text-xs font-medium mb-1.5" style={{ color: dayScore.verdictColor }}>
+                            {dayScore.verdict}{dayScore.isPartial ? '*' : ''}
+                          </p>
+                          {/* Mini score bar */}
+                          <div className="h-1 rounded-full bg-navy-700 mb-1.5 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${(dayScore.score / dayScore.maxPossible) * 100}%`,
+                                backgroundColor: dayScore.verdictColor,
+                              }}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="h-8 mb-1.5" />
+                      )}
+
+                      {/* Wind range */}
                       {windRange && (
-                        <span className="block text-xs text-gray-500 mt-0.5">
+                        <p className="text-xs text-gray-500">
                           {windRange.min}–{windRange.max} kt
+                        </p>
+                      )}
+
+                      {/* Air temp + coefficient */}
+                      <div className="flex items-center justify-between mt-0.5">
+                        {airTemp !== null && (
+                          <span className="text-xs text-gray-500">{airTemp}°</span>
+                        )}
+                        <span className="text-xs ml-auto" style={{ color: beyondMarine ? '#4b5563' : getCoefficientColor(d.coefficient) }}>
+                          C{d.coefficient}
                         </span>
-                      )}
-                      {beyondMarine && (
-                        <span className="block text-xs text-gray-600 mt-0.5">🌤 météo</span>
-                      )}
-                      {resLabel && !beyondMarine && (
-                        <span className="block text-xs text-gray-600 mt-0.5">~{resLabel}</span>
-                      )}
-                      {dotColor && (
-                        <span
-                          className="absolute -top-1 -right-1 w-3 h-3 rounded-full border border-navy-800"
-                          style={{ backgroundColor: dotColor }}
-                        />
-                      )}
+                      </div>
                     </button>
                   );
                 })}
               </div>
-              {weather && (
-                <div className="flex items-center gap-4 mt-2 text-xs text-gray-600 flex-wrap">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-teal-400 inline-block" />
-                    Excellente fenêtre
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
-                    Bonne fenêtre
-                  </span>
-                  <span className="flex items-center gap-1.5 text-gray-700">
-                    🌤 Météo seule (au-delà de ~7j)
-                  </span>
-                </div>
-              )}
+
+              {/* Legend */}
+              <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-700 flex-wrap">
+                <span>Score /100 (indice de plongeabilité à midi)</span>
+                {tideData.some((d) => isDayBeyondMarine(d.date, marineHorizonDate)) && (
+                  <span className="text-gray-700">* score partiel /45 (au-delà de ~7j, météo seule)</span>
+                )}
+              </div>
             </>
           )}
+          {tidesError && (
+            <div className="flex items-center gap-3 p-2 bg-red-900/20 border border-red-700/40 rounded-lg">
+              <span className="text-red-400 text-xs flex-1">{tidesError}</span>
+              <button className="text-xs px-2 py-1 rounded bg-red-900/40 text-red-300" onClick={fetchTides}>Réessayer</button>
+            </div>
+          )}
         </div>
+      </header>
+
+      {/* Main content */}
+      <main className="max-w-screen-2xl mx-auto px-4 py-6">
 
         {/* Decision banner — meilleur créneau du jour */}
         <DiveDecisionBanner selectedDay={selectedDay} tideData={tideData} weather={weather} marineHorizonDate={marineHorizonDate} />
@@ -262,7 +336,6 @@ const AppInner: React.FC = () => {
             onRetry={fetchWeather}
             selectedDay={selectedDay}
             location={location}
-            onLocationChange={setLocation}
           />
           <DivabilityWidget selectedDate={selectedDate} weather={weather} marineHorizonDate={marineHorizonDate} />
         </div>
