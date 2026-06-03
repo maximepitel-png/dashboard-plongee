@@ -27,6 +27,7 @@ interface WeatherData {
       sea_surface_temperature: number[];
     };
   };
+  daily: { sunrise: string[]; sunset: string[] };
   location: { lat: number; lon: number; name: string };
 }
 

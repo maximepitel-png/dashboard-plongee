@@ -29,6 +29,10 @@ export interface WeatherData {
       sea_surface_temperature: number[];
     };
   };
+  daily: {
+    sunrise: string[];
+    sunset: string[];
+  };
   location: {
     lat: number;
     lon: number;
@@ -64,6 +68,16 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
     sst.push(+(13 + Math.sin(i / 48) * 1.5).toFixed(1));
   }
 
+  // Generate mock sunrise/sunset for 7 days (Normandy summer: ~6h05 / ~21h55)
+  const sunrises: string[] = [];
+  const sunsets: string[] = [];
+  for (let d = 0; d < 7; d++) {
+    const day = new Date(now.getTime() + d * 86400000);
+    const dateStr = day.toISOString().split('T')[0];
+    sunrises.push(`${dateStr}T06:05`);
+    sunsets.push(`${dateStr}T21:55`);
+  }
+
   return {
     current: {
       temperature: temp[0],
@@ -80,6 +94,10 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
       winddirection_10m: windDir,
       precipitation: precip,
       weathercode: wcode,
+    },
+    daily: {
+      sunrise: sunrises,
+      sunset: sunsets,
     },
     marine: {
       hourly: {
@@ -108,6 +126,7 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
           longitude: lon,
           current: 'temperature_2m,windspeed_10m,winddirection_10m,weathercode,precipitation',
           hourly: 'temperature_2m,windspeed_10m,winddirection_10m,precipitation,weathercode',
+          daily: 'sunrise,sunset',
           forecast_days: 7,
           wind_speed_unit: 'kn',
           timezone: 'Europe/Paris',
@@ -134,6 +153,10 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
         time: weatherRes.data.current.time,
       },
       hourly: weatherRes.data.hourly,
+      daily: {
+        sunrise: weatherRes.data.daily.sunrise,
+        sunset: weatherRes.data.daily.sunset,
+      },
       marine: { hourly: marineRes.data.hourly },
       location: { lat, lon, name: locationName },
     };

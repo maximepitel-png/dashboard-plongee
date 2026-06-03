@@ -4,6 +4,7 @@ import DivabilityWidget from './components/DivabilityWidget';
 import TidesWidget from './components/TidesWidget';
 import ClubDivesWidget from './components/ClubDivesWidget';
 import EquipmentWidget from './components/EquipmentWidget';
+import DiveDecisionBanner from './components/DiveDecisionBanner';
 
 const App: React.FC = () => {
   const [currentTime, setCurrentTime] = React.useState(new Date());
@@ -41,6 +42,9 @@ const App: React.FC = () => {
 
       {/* Main content */}
       <main className="max-w-screen-2xl mx-auto px-4 py-6">
+        {/* Decision banner — meilleur créneau du jour */}
+        <DiveDecisionBanner />
+
         {/* Top row: Weather + Divability */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
           <WeatherWidget />
