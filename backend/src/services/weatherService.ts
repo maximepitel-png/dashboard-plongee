@@ -21,6 +21,12 @@ export interface WeatherData {
     winddirection_10m: number[];
     precipitation: number[];
     weathercode: number[];
+    apparent_temperature: number[];
+    cloudcover: number[];
+    precipitation_probability: number[];
+    visibility: number[];
+    surface_pressure: number[];
+    uv_index: number[];
   };
   marine: {
     hourly: {
@@ -78,17 +84,31 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
   const currentVel: number[] = [];
   const currentDir: number[] = [];
   const sst: number[] = [];
+  const apparentTemp: number[] = [];
+  const cloudcover: number[] = [];
+  const precipProb: number[] = [];
+  const visibility: number[] = [];
+  const surfacePressure: number[] = [];
+  const uvIndex: number[] = [];
 
   for (let i = 0; i < 360; i++) {
     const t = new Date(now.getTime() + i * 3600000);
     times.push(t.toISOString().slice(0, 16));
     const w = +(8 + Math.sin(i / 24) * 6 + Math.random() * 3).toFixed(1);
-    temp.push(+(14 + Math.sin(i / 12) * 3 + Math.random() * 1).toFixed(1));
+    const t_val = +(14 + Math.sin(i / 12) * 3 + Math.random() * 1).toFixed(1);
+    temp.push(t_val);
     wind.push(w);
     windGusts.push(+(w * (1.3 + Math.random() * 0.3)).toFixed(1));
     windDir.push(Math.floor(200 + Math.sin(i / 18) * 60 + Math.random() * 20));
     precip.push(+(Math.random() < 0.2 ? Math.random() * 2 : 0).toFixed(1));
     wcode.push(Math.random() < 0.6 ? 1 : Math.random() < 0.5 ? 3 : 61);
+    apparentTemp.push(+(t_val - 2 + Math.sin(i * 0.26) * 1).toFixed(1));
+    const cc = Math.round(Math.max(0, Math.min(100, 50 + Math.sin(i * 0.3) * 40)));
+    cloudcover.push(cc);
+    precipProb.push(Math.round(Math.max(0, Math.min(100, 20 + Math.sin(i * 0.25) * 20))));
+    visibility.push(Math.max(1000, 20000 - cc * 150));
+    surfacePressure.push(Math.round(1013 + Math.sin(i * 0.05) * 8));
+    uvIndex.push(Math.max(0, Math.round(4 + Math.sin((i % 24 - 13) * 0.4) * 4)));
     if (i < 168) {
       marineTimes.push(t.toISOString().slice(0, 16));
       const wh = +(0.4 + Math.sin(i / 20) * 0.3 + Math.random() * 0.2).toFixed(2);
@@ -135,6 +155,12 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
       winddirection_10m: windDir,
       precipitation: precip,
       weathercode: wcode,
+      apparent_temperature: apparentTemp,
+      cloudcover,
+      precipitation_probability: precipProb,
+      visibility,
+      surface_pressure: surfacePressure,
+      uv_index: uvIndex,
     },
     daily: { sunrise: sunrises, sunset: sunsets },
     marineHorizonDate: marineTimes[marineTimes.length - 1] ?? new Date().toISOString(),
@@ -172,7 +198,7 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
           latitude: lat,
           longitude: lon,
           current: 'temperature_2m,windspeed_10m,winddirection_10m,weathercode,precipitation,windgusts_10m',
-          hourly: 'temperature_2m,windspeed_10m,windgusts_10m,winddirection_10m,precipitation,weathercode',
+          hourly: 'temperature_2m,windspeed_10m,windgusts_10m,winddirection_10m,precipitation,weathercode,apparent_temperature,cloudcover,precipitation_probability,visibility,surface_pressure,uv_index',
           daily: 'sunrise,sunset',
           forecast_days: 16,
           wind_speed_unit: 'kn',
