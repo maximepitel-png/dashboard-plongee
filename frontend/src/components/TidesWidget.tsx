@@ -28,8 +28,6 @@ interface DayTides {
   points: TidePoint[];
 }
 
-
-
 function formatTime(isoStr: string): string {
   return new Date(isoStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
 }
@@ -62,7 +60,7 @@ const CustomTooltip: React.FC<{ active?: boolean; payload?: TooltipPayload[]; la
   );
 };
 
-interface TidesWidgetProps {
+interface Props {
   selectedDay: number;
   tideData: DayTides[];
   tidesLoading: boolean;
@@ -70,25 +68,24 @@ interface TidesWidgetProps {
   onRetry: () => void;
 }
 
-const TidesWidget: React.FC<TidesWidgetProps> = ({ selectedDay, tideData, tidesLoading, tidesError, onRetry }) => {
-  const loading = tidesLoading;
-  const error = tidesError;
-
+const TidesWidget: React.FC<Props> = ({ selectedDay, tideData, tidesLoading, tidesError, onRetry }) => {
   const currentDay = tideData[selectedDay];
   const now = new Date().toISOString();
-  const currentHeight = currentDay?.points.reduce((prev, pt) =>
-    Math.abs(new Date(pt.time).getTime() - Date.now()) <
-    Math.abs(new Date(prev.time).getTime() - Date.now()) ? pt : prev,
-    currentDay.points[0]
-  );
 
-  const chartData = currentDay?.points.map((p) => ({
+  const currentHeight = currentDay?.points?.length
+    ? currentDay.points.reduce((prev, pt) =>
+        Math.abs(new Date(pt.time).getTime() - Date.now()) <
+        Math.abs(new Date(prev.time).getTime() - Date.now()) ? pt : prev,
+        currentDay.points[0]
+      )
+    : null;
+
+  const chartData = currentDay?.points?.map((p) => ({
     time: p.time,
     height: p.height,
     displayTime: formatTime(p.time),
   }));
 
-  // Thin out data for chart display
   const thinChartData = chartData?.filter((_, i) => i % 2 === 0);
 
   return (
@@ -103,138 +100,137 @@ const TidesWidget: React.FC<TidesWidgetProps> = ({ selectedDay, tideData, tidesL
         )}
       </div>
 
-      {loading && (
+      {tidesLoading && (
         <div className="flex items-center justify-center h-40 text-gray-500 animate-pulse">
           Calcul des marées...
         </div>
       )}
 
-      {error && (
-        <div className="flex items-center gap-3 p-3 bg-red-900/20 rounded-lg">
-          <span className="text-red-400 text-sm flex-1">{error}</span>
-          <button onClick={onRetry} className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors">
+      {tidesError && !tidesLoading && (
+        <div className="flex items-center gap-3 p-3 bg-red-900/20 border border-red-700/40 rounded-lg mb-3">
+          <span className="text-red-400 text-sm flex-1">{tidesError}</span>
+          <button
+            className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors"
+            onClick={onRetry}
+          >
             Réessayer
           </button>
         </div>
       )}
 
-      {!loading && tideData.length > 0 && (
+      {!tidesLoading && !tidesError && tideData.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          <p className="text-3xl mb-2">🌊</p>
+          <p>Aucune donnée de marée disponible</p>
+        </div>
+      )}
+
+      {!tidesLoading && !tidesError && currentDay && (
         <>
-
-          {currentDay && (
-            <>
-              {/* Current height indicator */}
-              {selectedDay === 0 && currentHeight && (
-                <div className="flex items-center gap-3 mb-4 bg-navy-900 rounded-lg p-3">
-                  <span className="text-2xl">🌊</span>
-                  <div>
-                    <p className="text-xl font-bold text-ocean-400">{currentHeight.height.toFixed(2)} m</p>
-                    <p className="text-xs text-gray-400">Hauteur actuelle</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Chart */}
-              <div className="h-48 mb-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={thinChartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
-                    <defs>
-                      <linearGradient id="tideGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#00b4d8" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#00b4d8" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#0f2d4a" />
-                    <XAxis
-                      dataKey="displayTime"
-                      interval={3}
-                      tick={{ fill: '#6b7280', fontSize: 10 }}
-                      axisLine={{ stroke: '#0f2d4a' }}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      domain={[0, 8]}
-                      tickCount={5}
-                      tick={{ fill: '#6b7280', fontSize: 10 }}
-                      axisLine={false}
-                      tickLine={false}
-                      width={30}
-                      tickFormatter={(v) => `${v}m`}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    {selectedDay === 0 && (
-                      <ReferenceLine
-                        x={formatTime(now)}
-                        stroke="#00b4d8"
-                        strokeDasharray="4 4"
-                        label={{ value: 'Maintenant', position: 'top', fill: '#00b4d8', fontSize: 10 }}
-                      />
-                    )}
-                    <Area
-                      type="monotone"
-                      dataKey="height"
-                      stroke="#00b4d8"
-                      strokeWidth={2}
-                      fill="url(#tideGradient)"
-                      dot={false}
-                      activeDot={{ r: 4, fill: '#00b4d8' }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+          {selectedDay === 0 && currentHeight && (
+            <div className="flex items-center gap-3 mb-4 bg-navy-900 rounded-lg p-3">
+              <span className="text-2xl">🌊</span>
+              <div>
+                <p className="text-xl font-bold text-ocean-400">{currentHeight.height.toFixed(2)} m</p>
+                <p className="text-xs text-gray-400">Hauteur actuelle</p>
               </div>
-
-              {/* Extremes table */}
-              <div className="grid grid-cols-2 gap-2">
-                {currentDay.extremes.map((ext, i) => (
-                  <div
-                    key={i}
-                    className={`rounded-lg p-2.5 flex items-center gap-2 ${
-                      ext.type === 'high' ? 'bg-ocean-500/10 border border-ocean-500/20' : 'bg-navy-900'
-                    }`}
-                  >
-                    <span className="text-xl">{ext.type === 'high' ? '⬆️' : '⬇️'}</span>
-                    <div>
-                      <p className="text-sm font-bold text-white">{ext.height.toFixed(2)} m</p>
-                      <p className="text-xs text-gray-400">{formatTime(ext.time)}</p>
-                    </div>
-                    <span className="ml-auto text-xs text-gray-500">
-                      {ext.type === 'high' ? 'PM' : 'BM'}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Coefficient bar */}
-              <div className="mt-3 bg-navy-900 rounded-lg p-2.5">
-                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                  <span>Coeff. marée estimé: <strong style={{ color: getCoefficientColor(currentDay.coefficient) }}>~{currentDay.coefficient}</strong></span>
-                  <span>{currentDay.coefficient <= 70 ? 'Morte-eau' : currentDay.coefficient >= 95 ? 'Vive-eau' : 'Modérée'}</span>
-                </div>
-                <div className="h-2 bg-navy-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${((currentDay.coefficient - 20) / 100) * 100}%`,
-                      backgroundColor: getCoefficientColor(currentDay.coefficient),
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-gray-600 mt-0.5">
-                  <span>20</span><span>70</span><span>95</span><span>120</span>
-                </div>
-              </div>
-
-              {/* Reference & disclaimer */}
-              <p className="text-xs text-gray-600 mt-3 text-center">
-                Hauteurs en mètres au-dessus du Zéro Hydrographique (ZH) · Calcul harmonique estimé · <span className="text-amber-600/70">Indicatif, pas pour la navigation</span>
-              </p>
-            </>
+            </div>
           )}
+
+          <div className="h-48 mb-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={thinChartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
+                <defs>
+                  <linearGradient id="tideGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#00b4d8" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#00b4d8" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#0f2d4a" />
+                <XAxis
+                  dataKey="displayTime"
+                  interval={3}
+                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  axisLine={{ stroke: '#0f2d4a' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={[0, 8]}
+                  tickCount={5}
+                  tick={{ fill: '#6b7280', fontSize: 10 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={30}
+                  tickFormatter={(v) => `${v}m`}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                {selectedDay === 0 && (
+                  <ReferenceLine
+                    x={formatTime(now)}
+                    stroke="#00b4d8"
+                    strokeDasharray="4 4"
+                    label={{ value: 'Maintenant', position: 'top', fill: '#00b4d8', fontSize: 10 }}
+                  />
+                )}
+                <Area
+                  type="monotone"
+                  dataKey="height"
+                  stroke="#00b4d8"
+                  strokeWidth={2}
+                  fill="url(#tideGradient)"
+                  dot={false}
+                  activeDot={{ r: 4, fill: '#00b4d8' }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {currentDay.extremes.map((ext, i) => (
+              <div
+                key={i}
+                className={`rounded-lg p-2.5 flex items-center gap-2 ${
+                  ext.type === 'high' ? 'bg-ocean-500/10 border border-ocean-500/20' : 'bg-navy-900'
+                }`}
+              >
+                <span className="text-xl">{ext.type === 'high' ? '⬆️' : '⬇️'}</span>
+                <div>
+                  <p className="text-sm font-bold text-white">{ext.height.toFixed(2)} m</p>
+                  <p className="text-xs text-gray-400">{formatTime(ext.time)}</p>
+                </div>
+                <span className="ml-auto text-xs text-gray-500">
+                  {ext.type === 'high' ? 'PM' : 'BM'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 bg-navy-900 rounded-lg p-2.5">
+            <div className="flex justify-between text-xs text-gray-400 mb-1">
+              <span>Coeff. marée estimé: <strong style={{ color: getCoefficientColor(currentDay.coefficient) }}>~{currentDay.coefficient}</strong></span>
+              <span>{currentDay.coefficient <= 70 ? 'Morte-eau' : currentDay.coefficient >= 95 ? 'Vive-eau' : 'Modérée'}</span>
+            </div>
+            <div className="h-2 bg-navy-700 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${((currentDay.coefficient - 20) / 100) * 100}%`,
+                  backgroundColor: getCoefficientColor(currentDay.coefficient),
+                }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-gray-600 mt-0.5">
+              <span>20</span><span>70</span><span>95</span><span>120</span>
+            </div>
+          </div>
+
+          <p className="text-xs text-gray-600 mt-3 text-center">
+            Hauteurs en mètres au-dessus du Zéro Hydrographique (ZH) · Calcul harmonique estimé · <span className="text-amber-600/70">Indicatif, pas pour la navigation</span>
+          </p>
         </>
       )}
 
-      {/* Source footer */}
-      {!loading && (
+      {!tidesLoading && (
         <p className="text-xs text-gray-700 mt-3 pt-2 border-t border-navy-800">
           Source · Modèle harmonique local (constituants SHOM Ouistreham) · Calculé le {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
         </p>
