@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { Target } from 'lucide-react';
+import { useUnits } from '../contexts/UnitContext';
 
 /**
  * CONFIGURATION DU SCORING — modifier ici pour ajuster les seuils
@@ -117,6 +119,8 @@ function computeDivability(
   precipitation: number,
   seaTemp: number,
   currentMs: number,
+  formatWind: (kt: number) => string = (kt) => `${Math.round(kt)} kt`,
+  formatTemp: (c: number) => string = (c) => `${Math.round(c)}°C`,
 ): DivabilityScore {
   const cfg = DIVABILITY_CONFIG;
 
@@ -136,8 +140,8 @@ function computeDivability(
 
   let verdict = '';
   let verdictColor = '';
-  if (total >= 80) { verdict = 'Excellente'; verdictColor = '#22c55e'; }
-  else if (total >= 60) { verdict = 'Bonne'; verdictColor = '#84cc16'; }
+  if (total >= 80) { verdict = 'Excellente'; verdictColor = '#2dd4bf'; }
+  else if (total >= 60) { verdict = 'Bonne'; verdictColor = '#2dd4bf'; }
   else if (total >= 40) { verdict = 'Moyenne'; verdictColor = '#f59e0b'; }
   else if (total >= 20) { verdict = 'Déconseillée'; verdictColor = '#ef4444'; }
   else { verdict = 'Annulée'; verdictColor = '#991b1b'; }
@@ -147,10 +151,10 @@ function computeDivability(
     verdict,
     verdictColor,
     details: [
-      { label: 'Vent', value: `${Math.round(windKnots)} kt`, score: windScore, maxPts: cfg.wind.maxPts },
+      { label: 'Vent', value: formatWind(windKnots), score: windScore, maxPts: cfg.wind.maxPts },
       { label: 'Vagues', value: `${waveHeight.toFixed(1)} m`, score: waveScore, maxPts: cfg.waves.maxPts },
       { label: 'Clarté estimée', value: precipitation < 0.01 ? 'Favorable' : `${precipitation.toFixed(1)} mm/h`, score: clarityScore, maxPts: cfg.clarity.maxPts, note: 'proxy précip. surface — ≠ visibilité sous-marine' },
-      { label: 'Temp. mer', value: `${seaTemp.toFixed(1)}°C`, score: tempScore, maxPts: cfg.temperature.maxPts },
+      { label: 'Temp. mer', value: formatTemp(seaTemp), score: tempScore, maxPts: cfg.temperature.maxPts },
       { label: 'Courant', value: `${(currentMs * 1.944).toFixed(1)} kt`, score: currentScore, maxPts: cfg.current.maxPts },
     ],
   };
@@ -161,6 +165,7 @@ interface Props {
 }
 
 const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
+  const { formatWind, formatTemp } = useUnits();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [tidalImpact, setTidalImpact] = useState<TidalImpact | null>(null);
   const [loading, setLoading] = useState(true);
@@ -230,7 +235,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
       currentMs = weather.marine.hourly.ocean_current_velocity[i] || 0;
     }
 
-    const computed = computeDivability(windKnots, waveHeight, precipitation, seaTemp, currentMs);
+    const computed = computeDivability(windKnots, waveHeight, precipitation, seaTemp, currentMs, formatWind, formatTemp);
     setScore(computed);
   }, [weather, tidalImpact, selectedDate]);
 
@@ -241,7 +246,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
   return (
     <div className="card">
       <div className="card-header">
-        <span>🎯</span>
+        <Target size={18} className="text-ocean-400" />
         <span>Indice de Plongeabilité</span>
       </div>
 
@@ -265,7 +270,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
 
       {!loading && !error && !score && (
         <div className="text-center py-8 text-gray-500">
-          <p className="text-3xl mb-2">🎯</p>
+          <Target size={32} className="mx-auto mb-2 text-gray-600" />
           <p>Aucune donnée disponible</p>
         </div>
       )}

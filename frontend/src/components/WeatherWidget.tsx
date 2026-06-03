@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { Wind, Waves, AlertTriangle, Search } from 'lucide-react';
+import { useUnits } from '../contexts/UnitContext';
 
 interface WeatherData {
   current: {
@@ -98,6 +100,7 @@ function windDirectionLabel(deg: number): string {
 const DEFAULT_LOCATION = { lat: 49.2796, lon: -0.2602, name: 'Ouistreham' };
 
 const WeatherWidget: React.FC = () => {
+  const { formatWind, formatTemp } = useUnits();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -186,7 +189,7 @@ const WeatherWidget: React.FC = () => {
   return (
     <div className="card">
       <div className="card-header">
-        <span>🌊</span>
+        <Waves size={18} className="text-ocean-400" />
         <span>Météo Marine</span>
         <span className="ml-auto text-sm font-normal text-gray-400">{location.name}</span>
       </div>
@@ -201,7 +204,7 @@ const WeatherWidget: React.FC = () => {
           className="input flex-1"
         />
         <button type="submit" className="btn-primary" disabled={searching}>
-          {searching ? '...' : '🔍'}
+          {searching ? '...' : <Search size={14} />}
         </button>
         {location.name !== DEFAULT_LOCATION.name && (
           <button
@@ -234,7 +237,7 @@ const WeatherWidget: React.FC = () => {
 
       {weather?.isMock && !loading && (
         <div className="flex items-start gap-2 mb-4 p-3 bg-amber-900/30 border border-amber-600/50 rounded-lg text-amber-300 text-sm">
-          <span className="text-lg leading-none mt-0.5">⚠️</span>
+          <AlertTriangle size={16} className="text-amber-400 mt-0.5 shrink-0" />
           <div>
             <p className="font-semibold">Données de démonstration</p>
             <p className="text-amber-400/80 text-xs mt-0.5">L'API météo est temporairement indisponible. Les valeurs affichées sont fictives et ne reflètent pas les conditions réelles.</p>
@@ -249,16 +252,16 @@ const WeatherWidget: React.FC = () => {
             <div className="bg-navy-900 rounded-lg p-3 flex items-center gap-3">
               <span className="text-4xl">{weatherEmoji(weather.current.weathercode)}</span>
               <div>
-                <p className="text-2xl font-bold text-white">{Math.round(weather.current.temperature)}°C</p>
+                <p className="text-2xl font-bold text-white">{formatTemp(weather.current.temperature)}</p>
                 <p className="text-xs text-gray-400">{weatherDescription(weather.current.weathercode)}</p>
                 <p className="text-xs text-gray-500">Précip: {weather.current.precipitation.toFixed(1)} mm/h</p>
               </div>
             </div>
             <div className="bg-navy-900 rounded-lg p-3">
               <div className="flex items-center gap-1 mb-1">
-                <span className="text-ocean-400">💨</span>
-                <span className="text-lg font-bold">{Math.round(weather.current.windspeed)} kt</span>
-                <span className="text-xs text-gray-500 ml-1">rafales {Math.round(weather.current.windgusts)} kt</span>
+                <Wind size={16} className="text-ocean-400" />
+                <span className="text-lg font-bold">{formatWind(weather.current.windspeed)}</span>
+                <span className="text-xs text-gray-500 ml-1">rafales {formatWind(weather.current.windgusts)}</span>
               </div>
               <p className="text-xs text-gray-400">
                 {windDirectionLabel(weather.current.winddirection)} ({Math.round(weather.current.winddirection)}°)
@@ -296,7 +299,7 @@ const WeatherWidget: React.FC = () => {
               {/* Sea temp + wetsuit */}
               <div className="bg-navy-900 rounded-lg p-3">
                 <p className="text-xs text-gray-500 mb-1">Mer (surface)</p>
-                <p className="text-lg font-bold text-white">{marine.seaTemp.toFixed(1)}°C</p>
+                <p className="text-lg font-bold text-white">{formatTemp(marine.seaTemp)}</p>
                 <p className="text-xs text-ocean-400">{wetsuitAdvice(marine.seaTemp)}</p>
               </div>
             </div>
@@ -312,8 +315,8 @@ const WeatherWidget: React.FC = () => {
                     {new Date(h.time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                   <p className="text-lg">{weatherEmoji(h.code)}</p>
-                  <p className="text-xs font-medium">{Math.round(h.temp)}°</p>
-                  <p className="text-xs text-ocean-400">{Math.round(h.wind)} kt</p>
+                  <p className="text-xs font-medium">{formatTemp(h.temp)}</p>
+                  <p className="text-xs text-ocean-400">{formatWind(h.wind)}</p>
                   {h.precip > 0 && <p className="text-xs text-blue-400">{h.precip.toFixed(1)}mm</p>}
                 </div>
               ))}

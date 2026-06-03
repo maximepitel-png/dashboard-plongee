@@ -6,6 +6,8 @@ import TidesWidget from './components/TidesWidget';
 import ClubDivesWidget from './components/ClubDivesWidget';
 import EquipmentWidget from './components/EquipmentWidget';
 import DiveDecisionBanner from './components/DiveDecisionBanner';
+import { UnitProvider } from './contexts/UnitContext';
+import UnitSelector from './components/UnitSelector';
 
 interface TideExtreme {
   time: string;
@@ -76,6 +78,7 @@ const App: React.FC = () => {
   const selectedDate = tideData[selectedDay]?.date ?? '';
 
   return (
+    <UnitProvider>
     <div className="min-h-screen">
       {/* Header */}
       <header className="border-b border-navy-700 bg-navy-800/50 backdrop-blur-sm sticky top-0 z-10">
@@ -87,11 +90,14 @@ const App: React.FC = () => {
               <p className="text-xs text-gray-400">Ouistreham — Calvados</p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-300 capitalize">{formatDate(currentTime)}</p>
-            <p className="text-xs text-gray-500">
-              {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-            </p>
+          <div className="flex items-center gap-4">
+            <UnitSelector />
+            <div className="text-right">
+              <p className="text-sm text-gray-300 capitalize">{formatDate(currentTime)}</p>
+              <p className="text-xs text-gray-500">
+                {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
           </div>
         </div>
         {/* Decorative wave */}
@@ -166,6 +172,7 @@ const App: React.FC = () => {
         Dashboard Plongée — Ouistreham, Normandie &nbsp;•&nbsp; Données: Open-Meteo, prédiction harmonique SHOM
       </footer>
     </div>
+    </UnitProvider>
   );
 };
 
