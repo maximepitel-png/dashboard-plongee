@@ -316,26 +316,30 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
 
           {/* Score breakdown */}
           <div className="w-full space-y-2">
-            {score.details.map((d) => (
-              <div key={d.label}>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 w-24 shrink-0">{d.label}</span>
-                  <div className="flex-1 bg-navy-900 rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full transition-all duration-500"
-                      style={{
-                        width: `${(d.score / d.maxPts) * 100}%`,
-                        backgroundColor: d.score >= d.maxPts * 0.7 ? '#22c55e' : d.score >= d.maxPts * 0.4 ? '#f59e0b' : '#ef4444',
-                      }}
-                    />
+            {score.details.map((d) => {
+              const pct = (d.score / d.maxPts) * 100;
+              const barColor = d.score >= d.maxPts * 0.7 ? '#2dd4bf' : d.score >= d.maxPts * 0.4 ? '#f59e0b' : '#ef4444';
+              const qualLabel = d.score >= d.maxPts * 0.7 ? 'Favorable' : d.score >= d.maxPts * 0.4 ? 'Moyen' : 'Défavorable';
+              return (
+                <div key={d.label}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400 w-24 shrink-0">{d.label}</span>
+                    <div className="flex-1 bg-navy-900 rounded-full h-2.5 relative" title={`${d.score}/${d.maxPts} pts — ${qualLabel}`}>
+                      <div
+                        className="h-2.5 rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%`, backgroundColor: barColor }}
+                      />
+                    </div>
+                    <span className="text-xs text-gray-300 w-16 text-right shrink-0">{d.value}</span>
+                    <span className="text-xs w-20 text-right shrink-0" style={{ color: barColor }}>{qualLabel}</span>
                   </div>
-                  <span className="text-xs text-gray-300 w-16 text-right shrink-0">{d.value}</span>
+                  {d.note && (
+                    <p className="text-xs text-amber-500/70 ml-24 mt-0.5 italic">{d.note}</p>
+                  )}
                 </div>
-                {d.note && (
-                  <p className="text-xs text-amber-500/70 ml-24 mt-0.5 italic">{d.note}</p>
-                )}
-              </div>
-            ))}
+              );
+            })}
+            <p className="text-xs text-gray-600 mt-1 italic">Barre courte = facteur défavorable · Barre pleine = facteur optimal</p>
           </div>
 
           {/* Tidal info */}

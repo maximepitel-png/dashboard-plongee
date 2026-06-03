@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { AlertTriangle } from 'lucide-react';
 
 /**
  * ALGORITHME DE DÉCISION — Meilleure fenêtre de plongée du jour
@@ -132,8 +133,8 @@ function computeEtaleWindows(
 }
 
 function qualityLabel(score: number): { label: string; color: string; bg: string } {
-  if (score >= 55) return { label: 'Excellente', color: '#22c55e', bg: 'bg-green-900/30 border-green-600/40' };
-  if (score >= 40) return { label: 'Bonne', color: '#84cc16', bg: 'bg-lime-900/30 border-lime-600/40' };
+  if (score >= 55) return { label: 'Excellente', color: '#2dd4bf', bg: 'bg-teal-900/30 border-teal-600/40' };
+  if (score >= 40) return { label: 'Bonne', color: '#2dd4bf', bg: 'bg-teal-900/30 border-teal-600/40' };
   if (score >= 25) return { label: 'Moyenne', color: '#f59e0b', bg: 'bg-amber-900/30 border-amber-600/40' };
   return { label: 'Difficile', color: '#ef4444', bg: 'bg-red-900/30 border-red-600/40' };
 }
@@ -263,8 +264,8 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData }) => {
         </div>
 
         {/* Disclaimer */}
-        <p className="text-xs text-gray-600 mt-3 pt-2 border-t border-white/5">
-          ⚠️ Aide indicative uniquement — jamais une autorisation de mise à l'eau. Consulter MétéoFrance et les tables SHOM avant toute plongée.
+        <p className="text-xs text-gray-600 mt-3 pt-2 border-t border-white/5 flex items-center gap-1">
+          <AlertTriangle size={12} className="text-gray-600 shrink-0" /> Aide indicative uniquement — jamais une autorisation de mise à l'eau. Consulter MétéoFrance et les tables SHOM avant toute plongée.
           {weather.isMock && <span className="text-amber-600/70"> · Données fictives (API indisponible)</span>}
         </p>
       </div>

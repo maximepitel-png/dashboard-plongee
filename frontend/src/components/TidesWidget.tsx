@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
+import { Waves, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface TidePoint {
   time: string;
@@ -91,7 +92,7 @@ const TidesWidget: React.FC<Props> = ({ selectedDay, tideData, tidesLoading, tid
   return (
     <div className="card">
       <div className="card-header">
-        <span>🌊</span>
+        <Waves size={18} className="text-ocean-400" />
         <span>Marées — Ouistreham</span>
         {currentDay && (
           <span className="ml-auto text-sm font-normal" style={{ color: getCoefficientColor(currentDay.coefficient) }}>
@@ -120,7 +121,7 @@ const TidesWidget: React.FC<Props> = ({ selectedDay, tideData, tidesLoading, tid
 
       {!tidesLoading && !tidesError && tideData.length === 0 && (
         <div className="text-center py-8 text-gray-500">
-          <p className="text-3xl mb-2">🌊</p>
+          <Waves size={32} className="mx-auto mb-2 text-gray-600" />
           <p>Aucune donnée de marée disponible</p>
         </div>
       )}
@@ -129,7 +130,7 @@ const TidesWidget: React.FC<Props> = ({ selectedDay, tideData, tidesLoading, tid
         <>
           {selectedDay === 0 && currentHeight && (
             <div className="flex items-center gap-3 mb-4 bg-navy-900 rounded-lg p-3">
-              <span className="text-2xl">🌊</span>
+              <Waves size={24} className="text-ocean-400" />
               <div>
                 <p className="text-xl font-bold text-ocean-400">{currentHeight.height.toFixed(2)} m</p>
                 <p className="text-xs text-gray-400">Hauteur actuelle</p>
@@ -193,7 +194,7 @@ const TidesWidget: React.FC<Props> = ({ selectedDay, tideData, tidesLoading, tid
                   ext.type === 'high' ? 'bg-ocean-500/10 border border-ocean-500/20' : 'bg-navy-900'
                 }`}
               >
-                <span className="text-xl">{ext.type === 'high' ? '⬆️' : '⬇️'}</span>
+                {ext.type === 'high' ? <TrendingUp size={20} className="text-ocean-400" /> : <TrendingDown size={20} className="text-gray-400" />}
                 <div>
                   <p className="text-sm font-bold text-white">{ext.height.toFixed(2)} m</p>
                   <p className="text-xs text-gray-400">{formatTime(ext.time)}</p>
