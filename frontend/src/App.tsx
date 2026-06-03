@@ -179,7 +179,7 @@ const AppInner: React.FC = () => {
     <SiteAdjustmentProvider selectedSite={selectedSite}>
     <div className="min-h-screen">
       {/* Header */}
-      <header className="border-b border-navy-700 bg-navy-800/50 backdrop-blur-sm sticky top-0 z-10">
+      <header className="border-b border-navy-700 bg-navy-800/50 backdrop-blur-sm sticky top-0 z-50">
         {/* Row 1: branding + location + search + units + clock */}
         <div className="max-w-screen-2xl mx-auto px-4 py-3 flex items-center gap-4 flex-wrap">
           {/* Logo */}
