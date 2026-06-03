@@ -142,9 +142,10 @@ function qualityLabel(score: number): { label: string; color: string; bg: string
 interface Props {
   selectedDay: number;
   tideData: DayTides[];
+  marineHorizonDate?: string | null;
 }
 
-const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData }) => {
+const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, marineHorizonDate }) => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -194,6 +195,20 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData }) => {
 
   const day = tideData[selectedDay];
   if (!day) return null;
+
+  const beyondMarine = marineHorizonDate
+    ? new Date((tideData[selectedDay]?.date ?? '') + 'T12:00:00') > new Date(marineHorizonDate)
+    : false;
+
+  if (beyondMarine) {
+    return (
+      <div className="mb-4 rounded-xl border border-navy-700 bg-navy-800/50 p-4">
+        <p className="text-sm text-gray-400">
+          <span className="font-medium text-amber-400">Horizon marin dépassé</span> — Les fenêtres d'étale nécessitent des données de houle et courant, disponibles uniquement sur ~7 jours. Pour ce jour, seule la prévision météo (vent, précipitations) est disponible.
+        </p>
+      </div>
+    );
+  }
 
   const windows = computeEtaleWindows(day.extremes, weather, selectedDay);
   const best = windows.length > 0 ? windows.reduce((a, b) => (b.score > a.score ? b : a)) : null;

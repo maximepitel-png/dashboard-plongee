@@ -164,9 +164,10 @@ function computeDivability(
 
 interface Props {
   selectedDate: string; // "YYYY-MM-DD" ou "" pour aujourd'hui
+  marineHorizonDate?: string | null;
 }
 
-const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
+const DivabilityWidget: React.FC<Props> = ({ selectedDate, marineHorizonDate }) => {
   const { formatWind, formatTemp } = useUnits();
   const { selectedSite } = useSiteAdjustment();
   const multipliers = getSiteMultipliers(selectedSite);
@@ -243,6 +244,10 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
     setScore(computed);
   }, [weather, tidalImpact, selectedDate, multipliers.wind, multipliers.swell, multipliers.current]);
 
+  const beyondMarine = marineHorizonDate
+    ? new Date((selectedDate || new Date().toISOString().slice(0, 10)) + 'T12:00:00') > new Date(marineHorizonDate)
+    : false;
+
   const gaugePercentage = score ? score.total : 0;
   const circumference = 2 * Math.PI * 54;
   const strokeDashoffset = circumference - (gaugePercentage / 100) * circumference;
@@ -272,14 +277,45 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
         </div>
       )}
 
-      {!loading && !error && !score && (
+      {!loading && !error && !score && !beyondMarine && (
         <div className="text-center py-8 text-gray-500">
           <Target size={32} className="mx-auto mb-2 text-gray-600" />
           <p>Aucune donnée disponible</p>
         </div>
       )}
 
-      {score && !loading && (
+      {beyondMarine && !loading && (
+        <div className="flex flex-col items-center py-4 text-center">
+          <p className="text-amber-400 font-medium mb-2">Indice de plongeabilité non disponible</p>
+          <p className="text-xs text-gray-500 max-w-xs">
+            Les données de houle, courant et température de l'eau ne sont disponibles que sur ~7 jours (horizon API Marine).
+            Au-delà, seule la tendance météo (vent, précipitations) est exploitable.
+          </p>
+          {weather && (() => {
+            const targetTime = new Date((selectedDate || new Date().toISOString().slice(0, 10)) + 'T12:00:00').toISOString().slice(0, 13);
+            const hourIdx = weather.hourly.time.findIndex((t) => t >= targetTime);
+            const idx = hourIdx >= 0 ? hourIdx : 0;
+            const wind = weather.hourly.windspeed_10m[idx] || 0;
+            const precip = weather.hourly.precipitation[idx] || 0;
+            return (
+              <div className="mt-4 grid grid-cols-2 gap-3 w-full">
+                <div className="bg-navy-900 rounded-lg p-3 text-center">
+                  <p className="text-xs text-gray-500 mb-1">Vent prévu</p>
+                  <p className="text-lg font-bold text-white">{Math.round(wind)} kt</p>
+                  <p className="text-xs text-gray-600">~3–6h résolution</p>
+                </div>
+                <div className="bg-navy-900 rounded-lg p-3 text-center">
+                  <p className="text-xs text-gray-500 mb-1">Précipitations</p>
+                  <p className="text-lg font-bold text-white">{precip.toFixed(1)} mm/h</p>
+                  <p className="text-xs text-gray-600">Indicatif</p>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {!beyondMarine && score && !loading && (
         <div className="flex flex-col items-center">
           {/* Circular gauge */}
           <div className="relative mb-4">
@@ -366,7 +402,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
       )}
 
       {/* Source footer */}
-      {score && !loading && (
+      {!beyondMarine && score && !loading && (
         <p className="text-xs text-gray-700 mt-3 pt-2 border-t border-navy-800">
           Source · Open-Meteo + modèle harmonique local · Calcul indicatif, seuils arbitraires · Calculé à {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
         </p>

@@ -307,7 +307,13 @@ const WeatherWidget: React.FC = () => {
 
           {/* 24h forecast */}
           <div>
-            <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Prévisions 24h</p>
+            <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider">
+              Prévisions 24h
+              {getNext24h().some(h => {
+                const daysDiff = (new Date(h.time).getTime() - Date.now()) / 86400000;
+                return daysDiff > 7;
+              }) && <span className="normal-case ml-2 text-gray-700">· résolution ~3–6h</span>}
+            </p>
             <div className="grid grid-cols-4 gap-1.5">
               {getNext24h().map((h, i) => (
                 <div key={i} className="bg-navy-900 rounded-lg p-2 text-center">

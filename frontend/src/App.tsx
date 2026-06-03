@@ -164,34 +164,55 @@ const AppInner: React.FC = () => {
           )}
           {!tidesLoading && !tidesError && tideData.length > 0 && (
             <>
-              <div className="flex gap-1.5 flex-wrap">
-                {tideData.map((d, i) => (
-                  <button
-                    key={d.date}
-                    onClick={() => setSelectedDay(i)}
-                    className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      selectedDay === i ? 'bg-ocean-500 text-white' : 'bg-navy-800 text-gray-400 hover:bg-navy-700'
-                    }`}
-                  >
-                    <span className="block">{formatDayTab(d.date)}</span>
-                    <span className="block" style={{ color: getCoefficientColor(d.coefficient) }}>
-                      ~C{d.coefficient}
-                    </span>
-                    {scoringWeather && (() => {
-                      const ds = computeDayScore(d.extremes, scoringWeather, i);
-                      if (ds.quality === 'excellent') return (
-                        <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-teal-400 border border-navy-800" title="Excellente fenêtre" />
-                      );
-                      if (ds.quality === 'good') return (
-                        <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 border border-navy-800" title="Bonne fenêtre" />
-                      );
-                      return null;
-                    })()}
-                  </button>
-                ))}
+              <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+                {tideData.map((d, i) => {
+                  const beyondMarine = isDayBeyondMarine(d.date, marineHorizonDate);
+                  const windRange = scoringWeather ? getDayWindRange(d.date, scoringWeather) : null;
+                  const resLabel = forecastResolutionLabel(i);
+
+                  let dotColor: string | null = null;
+                  if (!beyondMarine && scoringWeather) {
+                    const ds = computeDayScore(d.extremes, scoringWeather, i);
+                    if (ds.quality === 'excellent') dotColor = '#2dd4bf';
+                    else if (ds.quality === 'good') dotColor = '#f59e0b';
+                  }
+
+                  return (
+                    <button
+                      key={d.date}
+                      onClick={() => setSelectedDay(i)}
+                      style={{ flexShrink: 0 }}
+                      className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                        selectedDay === i ? 'bg-ocean-500 text-white' : 'bg-navy-800 text-gray-400 hover:bg-navy-700'
+                      } ${beyondMarine ? 'opacity-75' : ''}`}
+                    >
+                      <span className="block">{formatDayTab(d.date)}</span>
+                      <span className="block" style={{ color: beyondMarine ? '#6b7280' : getCoefficientColor(d.coefficient) }}>
+                        ~C{d.coefficient}
+                      </span>
+                      {windRange && (
+                        <span className="block text-xs text-gray-500 mt-0.5">
+                          {windRange.min}–{windRange.max} kt
+                        </span>
+                      )}
+                      {beyondMarine && (
+                        <span className="block text-xs text-gray-600 mt-0.5">🌤 météo</span>
+                      )}
+                      {resLabel && !beyondMarine && (
+                        <span className="block text-xs text-gray-600 mt-0.5">~{resLabel}</span>
+                      )}
+                      {dotColor && (
+                        <span
+                          className="absolute -top-1 -right-1 w-3 h-3 rounded-full border border-navy-800"
+                          style={{ backgroundColor: dotColor }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
               {scoringWeather && (
-                <div className="flex items-center gap-4 mt-2 text-xs text-gray-600">
+                <div className="flex items-center gap-4 mt-2 text-xs text-gray-600 flex-wrap">
                   <span className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-teal-400 inline-block" />
                     Excellente fenêtre
@@ -200,6 +221,9 @@ const AppInner: React.FC = () => {
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
                     Bonne fenêtre
                   </span>
+                  <span className="flex items-center gap-1.5 text-gray-700">
+                    🌤 Météo seule (au-delà de ~7j)
+                  </span>
                 </div>
               )}
             </>
@@ -207,12 +231,12 @@ const AppInner: React.FC = () => {
         </div>
 
         {/* Decision banner — meilleur créneau du jour */}
-        <DiveDecisionBanner selectedDay={selectedDay} tideData={tideData} />
+        <DiveDecisionBanner selectedDay={selectedDay} tideData={tideData} marineHorizonDate={marineHorizonDate} />
 
         {/* Top row: Weather + Divability */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
           <WeatherWidget />
-          <DivabilityWidget selectedDate={selectedDate} />
+          <DivabilityWidget selectedDate={selectedDate} marineHorizonDate={marineHorizonDate} />
         </div>
 
         {/* Tides full width */}
