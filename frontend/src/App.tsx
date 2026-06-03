@@ -70,6 +70,26 @@ function getDayWindRange(date: string, weather: any): { min: number; max: number
 }
 
 const DEFAULT_LOCATION = { lat: 49.2796, lon: -0.2602, name: 'Ouistreham' };
+const FAVORITES_KEY = 'dive-dashboard-favorites';
+
+interface FavoriteLocation {
+  id: string;
+  name: string;       // full display name: "Granville — Manche, France"
+  shortName: string;  // before " — ": "Granville"
+  lat: number;
+  lon: number;
+  addedAt: number;
+}
+
+function loadFavorites(): FavoriteLocation[] {
+  try {
+    return JSON.parse(localStorage.getItem(FAVORITES_KEY) ?? '[]');
+  } catch { return []; }
+}
+
+function saveFavorites(favs: FavoriteLocation[]): void {
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
+}
 
 interface GeoSuggestion {
   id: number;
@@ -159,6 +179,7 @@ const AppInner: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const searchDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchContainerRef = React.useRef<HTMLDivElement>(null);
+  const [favorites, setFavorites] = React.useState<FavoriteLocation[]>(loadFavorites);
 
   React.useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -200,6 +221,46 @@ const AppInner: React.FC = () => {
   React.useEffect(() => {
     fetchWeather();
   }, [fetchWeather]);
+
+  // ── Favorites ────────────────────────────────────────────────────────────
+  const isFavorite = favorites.some(
+    (f) => Math.abs(f.lat - location.lat) < 0.001 && Math.abs(f.lon - location.lon) < 0.001
+  );
+
+  const toggleFavorite = () => {
+    let updated: FavoriteLocation[];
+    if (isFavorite) {
+      updated = favorites.filter(
+        (f) => !(Math.abs(f.lat - location.lat) < 0.001 && Math.abs(f.lon - location.lon) < 0.001)
+      );
+    } else {
+      const shortName = location.name.includes(' — ') ? location.name.split(' — ')[0] : location.name;
+      const newFav: FavoriteLocation = {
+        id: crypto.randomUUID(),
+        name: location.name,
+        shortName,
+        lat: location.lat,
+        lon: location.lon,
+        addedAt: Date.now(),
+      };
+      updated = [...favorites, newFav];
+    }
+    setFavorites(updated);
+    saveFavorites(updated);
+  };
+
+  const removeFavorite = (id: string) => {
+    const updated = favorites.filter((f) => f.id !== id);
+    setFavorites(updated);
+    saveFavorites(updated);
+  };
+
+  const selectFavorite = (f: FavoriteLocation) => {
+    setLocation({ lat: f.lat, lon: f.lon, name: f.name });
+    setSearchQuery('');
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
 
   // Close suggestions when clicking outside
   React.useEffect(() => {
@@ -272,8 +333,46 @@ const AppInner: React.FC = () => {
             <div className="flex items-center gap-2 mb-1">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00b4d8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
               <h1 className="text-lg font-bold text-ocean-400 leading-tight truncate">{location.name}</h1>
+              {/* Star button */}
+              <button
+                type="button"
+                onClick={toggleFavorite}
+                title={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                className="shrink-0 p-0.5 rounded transition-colors hover:bg-navy-700"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill={isFavorite ? '#f59e0b' : 'none'} stroke={isFavorite ? '#f59e0b' : '#6b7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </button>
               {weatherLoading && <span className="text-xs text-gray-600 animate-pulse">chargement…</span>}
             </div>
+            {/* Favorites bar */}
+            {favorites.length > 0 && (
+              <div className="flex items-center gap-1 mb-1 flex-wrap">
+                {favorites.sort((a, b) => a.addedAt - b.addedAt).map((f) => {
+                  const isActive = Math.abs(f.lat - location.lat) < 0.001 && Math.abs(f.lon - location.lon) < 0.001;
+                  return (
+                    <span key={f.id} className={`inline-flex items-center gap-0.5 rounded-full text-xs px-2 py-0.5 border transition-colors ${
+                      isActive
+                        ? 'bg-ocean-600/30 border-ocean-400/50 text-ocean-300'
+                        : 'bg-navy-900/60 border-navy-600/50 text-gray-400 hover:border-navy-500'
+                    }`}>
+                      <button type="button" onClick={() => selectFavorite(f)} className="leading-none">
+                        {f.shortName}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeFavorite(f.id)}
+                        title="Supprimer"
+                        className="ml-0.5 opacity-40 hover:opacity-100 transition-opacity leading-none"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             <div className="relative">
               <form onSubmit={handleLocationSearch} className="flex gap-1.5">
                 <input
