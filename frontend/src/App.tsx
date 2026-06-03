@@ -78,6 +78,27 @@ const AppInner: React.FC = () => {
   const [tideData, setTideData] = React.useState<DayTides[]>([]);
   const [tidesLoading, setTidesLoading] = React.useState(true);
   const [tidesError, setTidesError] = React.useState<string | null>(null);
+
+  // ── Compact day bar ──────────────────────────────────────────────────────
+  const [barIsCompact, setBarIsCompact] = React.useState(false);
+  const [barHovered, setBarHovered] = React.useState(false);
+  const [barTapped, setBarTapped] = React.useState(false);
+  const tapScrollRef = React.useRef<number>(0);
+
+  React.useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      setBarIsCompact(y > 80);
+      // Dismiss tap-expand after scrolling 300px past the tap point
+      if (barTapped && Math.abs(y - tapScrollRef.current) > 300) {
+        setBarTapped(false);
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [barTapped]);
+
+  const barExpanded = !barIsCompact || barHovered || barTapped;
   const [selectedDay, setSelectedDay] = React.useState(0);
   const [location, setLocation] = React.useState(DEFAULT_LOCATION);
   const [weather, setWeather] = React.useState<any>(null);
@@ -229,6 +250,14 @@ const AppInner: React.FC = () => {
               <div
                 className="flex gap-2 overflow-x-auto pb-1"
                 style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' } as React.CSSProperties}
+                onMouseEnter={() => setBarHovered(true)}
+                onMouseLeave={() => setBarHovered(false)}
+                onClick={() => {
+                  if (barIsCompact && !barHovered) {
+                    tapScrollRef.current = window.scrollY;
+                    setBarTapped((v) => !v);
+                  }
+                }}
               >
                 {tideData.map((d, i) => {
                   const beyondMarine = isDayBeyondMarine(d.date, marineHorizonDate);
@@ -257,78 +286,93 @@ const AppInner: React.FC = () => {
                           : 'bg-navy-900/80 border border-navy-700/60 hover:border-navy-500'
                       } ${beyondMarine ? 'opacity-70' : ''}`}
                     >
-                      {/* Date */}
-                      <p className={`text-xs font-semibold mb-1 ${isSelected ? 'text-ocean-300' : 'text-gray-400'}`}>
-                        {isToday ? "Aujourd'hui" : formatDayTab(d.date)}
-                      </p>
-
-                      {/* Divability score */}
-                      {dayScore ? (
-                        <>
-                          <div className="flex items-baseline gap-1 mb-1">
-                            <span className="text-lg font-bold leading-none" style={{ color: dayScore.verdictColor }}>
-                              {dayScore.score}
-                            </span>
-                            <span className="text-xs text-gray-600">/{dayScore.maxPossible}</span>
-                          </div>
-                          <p className="text-xs font-medium mb-1.5" style={{ color: dayScore.verdictColor }}>
-                            {dayScore.verdict}{dayScore.isPartial ? '*' : ''}
-                          </p>
-                          {/* Mini score bar */}
-                          <div className="h-1 rounded-full bg-navy-700 mb-1.5 overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{
-                                width: `${(dayScore.score / dayScore.maxPossible) * 100}%`,
-                                backgroundColor: dayScore.verdictColor,
-                              }}
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="h-8 mb-1.5" />
-                      )}
-
-                      {/* Wind range */}
-                      {windRange && (() => {
-                        const unit = formatWind(0).includes('km') ? 'km/h' : 'kt';
-                        const conv = unit === 'km/h' ? (v: number) => Math.round(v * 1.852) : (v: number) => v;
-                        return (
-                          <p className="text-xs text-gray-500">
-                            {conv(windRange.min)}–{conv(windRange.max)} {unit}
-                          </p>
-                        );
-                      })()}
-
-                      {/* Reliability bar */}
-                      {(() => {
-                        const rel = forecastReliability(i);
-                        return (
-                          <div className="flex items-center gap-1 mt-1">
-                            <div className="flex-1 h-0.5 rounded-full bg-navy-700 overflow-hidden">
-                              <div className="h-full rounded-full" style={{ width: `${rel.pct}%`, backgroundColor: rel.color }} />
-                            </div>
-                            <span className="text-xs shrink-0" style={{ color: rel.color }}>{rel.pct}%</span>
-                          </div>
-                        );
-                      })()}
-
-                      {/* Air temp + coefficient */}
-                      <div className="flex items-center justify-between mt-0.5">
-                        {airTemp !== null && (
-                          <span className="text-xs text-gray-500">{formatTemp(airTemp)}</span>
-                        )}
-                        <span className="text-xs ml-auto" style={{ color: beyondMarine ? '#4b5563' : getCoefficientColor(d.coefficient) }}>
+                      {/* ── Always visible: date + coefficient ── */}
+                      <div className="flex items-center justify-between">
+                        <p className={`text-xs font-semibold ${isSelected ? 'text-ocean-300' : 'text-gray-400'}`}>
+                          {isToday ? "Auj." : formatDayTab(d.date)}
+                        </p>
+                        <span className="text-xs" style={{ color: beyondMarine ? '#4b5563' : getCoefficientColor(d.coefficient) }}>
                           {d.coefficientIsEstimate ? '~' : ''}C{d.coefficient}
                         </span>
+                      </div>
+
+                      {/* ── Collapsible details ── */}
+                      <div
+                        style={{
+                          maxHeight: barExpanded ? '120px' : '0px',
+                          opacity: barExpanded ? 1 : 0,
+                          overflow: 'hidden',
+                          transition: 'max-height 240ms ease, opacity 200ms ease',
+                        }}
+                      >
+                        {/* Divability score */}
+                        {dayScore ? (
+                          <>
+                            <div className="flex items-baseline gap-1 mt-1 mb-0.5">
+                              <span className="text-lg font-bold leading-none" style={{ color: dayScore.verdictColor }}>
+                                {dayScore.score}
+                              </span>
+                              <span className="text-xs text-gray-600">/{dayScore.maxPossible}</span>
+                            </div>
+                            <p className="text-xs font-medium mb-1" style={{ color: dayScore.verdictColor }}>
+                              {dayScore.verdict}{dayScore.isPartial ? '*' : ''}
+                            </p>
+                            <div className="h-1 rounded-full bg-navy-700 mb-1 overflow-hidden">
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${(dayScore.score / dayScore.maxPossible) * 100}%`,
+                                  backgroundColor: dayScore.verdictColor,
+                                }}
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <div className="h-8 mb-1" />
+                        )}
+
+                        {/* Wind range */}
+                        {windRange && (() => {
+                          const unit = formatWind(0).includes('km') ? 'km/h' : 'kt';
+                          const conv = unit === 'km/h' ? (v: number) => Math.round(v * 1.852) : (v: number) => v;
+                          return (
+                            <p className="text-xs text-gray-500 mb-0.5">
+                              {conv(windRange.min)}–{conv(windRange.max)} {unit}
+                            </p>
+                          );
+                        })()}
+
+                        {/* Reliability + air temp */}
+                        {(() => {
+                          const rel = forecastReliability(i);
+                          return (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <div className="flex-1 h-0.5 rounded-full bg-navy-700 overflow-hidden">
+                                <div className="h-full rounded-full" style={{ width: `${rel.pct}%`, backgroundColor: rel.color }} />
+                              </div>
+                              <span className="text-xs shrink-0" style={{ color: rel.color }}>{rel.pct}%</span>
+                              {airTemp !== null && (
+                                <span className="text-xs text-gray-500 ml-1">{formatTemp(airTemp)}</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Legend */}
-              <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-700 flex-wrap">
+              {/* Legend — hidden in compact mode */}
+              <div
+                className="flex items-center gap-4 mt-1.5 text-xs text-gray-700 flex-wrap"
+                style={{
+                  maxHeight: barExpanded ? '40px' : '0px',
+                  opacity: barExpanded ? 1 : 0,
+                  overflow: 'hidden',
+                  transition: 'max-height 240ms ease, opacity 200ms ease',
+                }}
+              >
                 <span>Score /100 (indice de plongeabilité à midi)</span>
                 {tideData.some((d) => isDayBeyondMarine(d.date, marineHorizonDate)) && (
                   <span className="text-gray-700">* score partiel /45 (au-delà de ~7j, météo seule)</span>
