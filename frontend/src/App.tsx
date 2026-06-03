@@ -47,6 +47,30 @@ function getCoefficientColor(coeff: number): string {
   return '#ef4444';
 }
 
+function isDayBeyondMarine(date: string, marineHorizonDate: string | null): boolean {
+  if (!marineHorizonDate) return false;
+  return new Date(date + 'T12:00:00') > new Date(marineHorizonDate);
+}
+
+function forecastResolutionLabel(dayIndex: number): string | null {
+  if (dayIndex <= 6) return null;
+  if (dayIndex <= 9) return '~3h';
+  return '~6h';
+}
+
+function getDayWindRange(date: string, weather: any): { min: number; max: number } | null {
+  if (!weather?.hourly?.time) return null;
+  const dayStr = date;
+  const indices = weather.hourly.time
+    .map((t: string, i: number) => ({ t, i }))
+    .filter(({ t }: { t: string }) => t.startsWith(dayStr))
+    .map(({ i }: { i: number }) => i);
+  if (indices.length === 0) return null;
+  const winds = indices.map((i: number) => weather.hourly.windspeed_10m[i]).filter((v: number) => v != null);
+  if (winds.length === 0) return null;
+  return { min: Math.round(Math.min(...winds)), max: Math.round(Math.max(...winds)) };
+}
+
 const AppInner: React.FC = () => {
   const { selectedSite } = useDiveSites();
   const [currentTime, setCurrentTime] = React.useState(new Date());
@@ -86,6 +110,7 @@ const AppInner: React.FC = () => {
     d.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const selectedDate = tideData[selectedDay]?.date ?? '';
+  const marineHorizonDate = scoringWeather?.marineHorizonDate ?? null;
 
   return (
     <SiteAdjustmentProvider selectedSite={selectedSite}>
