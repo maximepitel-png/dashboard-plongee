@@ -375,7 +375,7 @@ const AppInner: React.FC = () => {
 
         {/* Row 3: Tides full width */}
         <div className="mb-4">
-          <TidesWidget selectedDay={selectedDay} tideData={tideData} tidesLoading={tidesLoading} tidesError={tidesError} onRetry={fetchTides} />
+          <TidesWidget selectedDay={selectedDay} tideData={tideData} tidesLoading={tidesLoading} tidesError={tidesError} onRetry={fetchTides} weather={weather} />
         </div>
 
         {/* Row 4: Club + Equipment + DiveSites */}
