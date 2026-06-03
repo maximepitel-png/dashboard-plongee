@@ -517,6 +517,12 @@ const GraphMode: React.FC<{
   selectedDay: number;
   marineHorizonDate: string | null;
 }> = ({ weather, dayTides, selectedDay, marineHorizonDate }) => {
+  const { formatWind, formatTemp } = useUnits();
+  const convertWindNum = (kt: number): number =>
+    formatWind(0).includes('km') ? Math.round(kt * 1.852) : Math.round(kt);
+  const windChartLabel = formatWind(0).includes('km') ? 'km/h' : 'kt';
+  const tempUnitLabel = formatTemp(0).includes('F') ? '°F' : '°C';
+
   const date = (() => {
     const d = new Date();
     d.setDate(d.getDate() + selectedDay);
@@ -543,9 +549,13 @@ const GraphMode: React.FC<{
 
     return {
       hour: `${String(h).padStart(2, '0')}h`,
-      wind: fIdx >= 0 ? Math.round(weather.hourly.windspeed_10m[fIdx] ?? 0) : null,
-      gusts: fIdx >= 0 ? Math.round(weather.hourly.windgusts_10m[fIdx] ?? 0) : null,
-      temp: fIdx >= 0 ? parseFloat((weather.hourly.temperature_2m[fIdx] ?? 0).toFixed(1)) : null,
+      wind: fIdx >= 0 ? convertWindNum(weather.hourly.windspeed_10m[fIdx] ?? 0) : null,
+      gusts: fIdx >= 0 ? convertWindNum(weather.hourly.windgusts_10m[fIdx] ?? 0) : null,
+      temp: fIdx >= 0
+        ? (tempUnitLabel === '°F'
+          ? parseFloat(((weather.hourly.temperature_2m[fIdx] ?? 0) * 9 / 5 + 32).toFixed(1))
+          : parseFloat((weather.hourly.temperature_2m[fIdx] ?? 0).toFixed(1)))
+        : null,
       precip: fIdx >= 0 ? parseFloat((weather.hourly.precipitation[fIdx] ?? 0).toFixed(2)) : null,
       waves: !beyondMarine && mIdx >= 0 ? parseFloat((weather.marine.hourly.wave_height[mIdx] ?? 0).toFixed(2)) : null,
       swell: !beyondMarine && mIdx >= 0 ? parseFloat((weather.marine.hourly.swell_wave_height[mIdx] ?? 0).toFixed(2)) : null,
@@ -557,7 +567,7 @@ const GraphMode: React.FC<{
     <div className="space-y-6">
       {/* Wind + Gusts */}
       <div>
-        <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Vent (kt)</p>
+        <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Vent ({windChartLabel})</p>
         <ResponsiveContainer width="100%" height={140}>
           <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#0f2d4a" />
@@ -603,14 +613,14 @@ const GraphMode: React.FC<{
 
       {/* Temperature */}
       <div>
-        <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Température (°C)</p>
+        <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Température ({tempUnitLabel})</p>
         <ResponsiveContainer width="100%" height={120}>
           <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#0f2d4a" />
             <XAxis dataKey="hour" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} width={28} />
             <Tooltip contentStyle={{ backgroundColor: '#0d1f35', border: '1px solid #1e3a5f', borderRadius: '8px', fontSize: '11px' }} />
-            <Line type="monotone" dataKey="temp" stroke="#fbbf24" strokeWidth={2} dot={false} name="Air (°C)" />
+            <Line type="monotone" dataKey="temp" stroke="#fbbf24" strokeWidth={2} dot={false} name={`Air (${tempUnitLabel})`} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
