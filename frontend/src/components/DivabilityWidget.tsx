@@ -164,15 +164,20 @@ function computeDivability(
   };
 }
 
-const DivabilityWidget: React.FC = () => {
+interface DivabilityWidgetProps {
+  selectedDate: string; // "YYYY-MM-DD" from parent day selector, "" = today
+}
+
+const DivabilityWidget: React.FC<DivabilityWidgetProps> = ({ selectedDate }) => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [tidalImpact, setTidalImpact] = useState<TidalImpact | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [score, setScore] = useState<DivabilityScore | null>(null);
 
   const fetchData = useCallback(async (timestamp?: number) => {
     setLoading(true);
+    setError(null);
     try {
       const [weatherRes, tideRes] = await Promise.all([
         axios.get('/api/weather'),
@@ -180,16 +185,21 @@ const DivabilityWidget: React.FC = () => {
       ]);
       setWeather(weatherRes.data);
       setTidalImpact(tideRes.data);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      setError('Impossible de calculer l\'indice de plongeabilité');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (selectedDate) {
+      const ts = new Date(selectedDate + 'T12:00:00').getTime();
+      fetchData(ts);
+    } else {
+      fetchData();
+    }
+  }, [fetchData, selectedDate]);
 
   useEffect(() => {
     if (!weather || !tidalImpact) return;
@@ -226,24 +236,6 @@ const DivabilityWidget: React.FC = () => {
     setScore(computed);
   }, [weather, tidalImpact, selectedDate]);
 
-  const handleDateChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const d = e.target.value;
-    setSelectedDate(d);
-    if (d) {
-      const ts = new Date(d + 'T12:00:00').getTime();
-      try {
-        const tideRes = await axios.get(`/api/tides/impact?timestamp=${ts}`);
-        setTidalImpact(tideRes.data);
-      } catch {}
-    } else {
-      fetchData();
-    }
-  };
-
-  // Calculate min date (today) and max date (7 days)
-  const today = new Date().toISOString().split('T')[0];
-  const maxDate = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
-
   const gaugePercentage = score ? score.total : 0;
   const circumference = 2 * Math.PI * 54;
   const strokeDashoffset = circumference - (gaugePercentage / 100) * circumference;
@@ -255,27 +247,25 @@ const DivabilityWidget: React.FC = () => {
         <span>Indice de Plongeabilité</span>
       </div>
 
-      {/* Date selector */}
-      <div className="flex items-center gap-3 mb-5">
-        <label className="text-sm text-gray-400">Date de plongée:</label>
-        <input
-          type="date"
-          className="input"
-          value={selectedDate}
-          min={today}
-          max={maxDate}
-          onChange={handleDateChange}
-        />
-        {selectedDate && (
-          <button className="btn-ghost text-xs" onClick={() => { setSelectedDate(''); fetchData(); }}>
-            Aujourd'hui
-          </button>
-        )}
-      </div>
+      {/* Label de la date sélectionnée (contrôlé par le sélecteur global) */}
+      {selectedDate && (
+        <p className="text-xs text-gray-500 mb-4">
+          Prévision pour le <span className="text-ocean-400">{new Date(selectedDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+        </p>
+      )}
 
       {loading && (
         <div className="flex items-center justify-center h-32 text-gray-500 animate-pulse">
           Calcul en cours...
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="flex items-center gap-3 p-3 bg-red-900/20 rounded-lg mb-2">
+          <span className="text-red-400 text-sm flex-1">{error}</span>
+          <button onClick={() => fetchData(selectedDate ? new Date(selectedDate + 'T12:00:00').getTime() : undefined)} className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors">
+            Réessayer
+          </button>
         </div>
       )}
 

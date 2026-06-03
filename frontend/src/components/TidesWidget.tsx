@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React from 'react';
 import {
   AreaChart,
   Area,
@@ -29,13 +28,7 @@ interface DayTides {
   points: TidePoint[];
 }
 
-const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-const MONTHS_FR = ['jan', 'fév', 'mar', 'avr', 'mai', 'jun', 'jul', 'aoû', 'sep', 'oct', 'nov', 'déc'];
 
-function formatDate(isoDate: string): string {
-  const d = new Date(isoDate + 'T00:00:00');
-  return `${DAYS_FR[d.getDay()]} ${d.getDate()} ${MONTHS_FR[d.getMonth()]}`;
-}
 
 function formatTime(isoStr: string): string {
   return new Date(isoStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
@@ -69,25 +62,17 @@ const CustomTooltip: React.FC<{ active?: boolean; payload?: TooltipPayload[]; la
   );
 };
 
-const TidesWidget: React.FC = () => {
-  const [tideData, setTideData] = useState<DayTides[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState(0);
+interface TidesWidgetProps {
+  selectedDay: number;
+  tideData: DayTides[];
+  tidesLoading: boolean;
+  tidesError: string | null;
+  onRetry: () => void;
+}
 
-  useEffect(() => {
-    const fetch = async () => {
-      try {
-        const res = await axios.get('/api/tides');
-        setTideData(res.data);
-      } catch {
-        setError('Impossible de charger les données de marées');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetch();
-  }, []);
+const TidesWidget: React.FC<TidesWidgetProps> = ({ selectedDay, tideData, tidesLoading, tidesError, onRetry }) => {
+  const loading = tidesLoading;
+  const error = tidesError;
 
   const currentDay = tideData[selectedDay];
   const now = new Date().toISOString();
@@ -125,30 +110,16 @@ const TidesWidget: React.FC = () => {
       )}
 
       {error && (
-        <div className="text-red-400 text-sm p-3 bg-red-900/20 rounded-lg">{error}</div>
+        <div className="flex items-center gap-3 p-3 bg-red-900/20 rounded-lg">
+          <span className="text-red-400 text-sm flex-1">{error}</span>
+          <button onClick={onRetry} className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors">
+            Réessayer
+          </button>
+        </div>
       )}
 
       {!loading && tideData.length > 0 && (
         <>
-          {/* Day selector */}
-          <div className="flex gap-1.5 mb-4 flex-wrap">
-            {tideData.map((day, i) => (
-              <button
-                key={day.date}
-                onClick={() => setSelectedDay(i)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  selectedDay === i
-                    ? 'bg-ocean-500 text-white'
-                    : 'bg-navy-900 text-gray-400 hover:bg-navy-700'
-                }`}
-              >
-                <span className="block">{formatDate(day.date)}</span>
-                <span className="block" style={{ color: getCoefficientColor(day.coefficient) }}>
-                  ~C{day.coefficient}
-                </span>
-              </button>
-            ))}
-          </div>
 
           {currentDay && (
             <>

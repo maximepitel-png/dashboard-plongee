@@ -29,7 +29,7 @@ interface TideExtreme {
   type: 'high' | 'low';
 }
 
-interface DayTides {
+export interface DayTides {
   date: string;
   coefficient: number;
   extremes: TideExtreme[];
@@ -138,62 +138,69 @@ function qualityLabel(score: number): { label: string; color: string; bg: string
   return { label: 'Difficile', color: '#ef4444', bg: 'bg-red-900/30 border-red-600/40' };
 }
 
-const DiveDecisionBanner: React.FC = () => {
-  const [tideData, setTideData] = useState<DayTides[]>([]);
+interface Props {
+  selectedDay: number;
+  tideData: DayTides[];
+}
+
+const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData }) => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedDay, setSelectedDay] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchWeather = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axios.get('/api/weather');
+      setWeather(res.data);
+    } catch {
+      setError('Impossible de charger les données météo pour le créneau de plongée');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [tidesRes, weatherRes] = await Promise.all([
-          axios.get('/api/tides'),
-          axios.get('/api/weather'),
-        ]);
-        setTideData(tidesRes.data);
-        setWeather(weatherRes.data);
-      } catch {
-        // silent — widgets below show individual errors
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    fetchWeather();
   }, []);
 
-  if (loading || !weather || tideData.length === 0) return null;
+  if (loading) {
+    return (
+      <div className="mb-4 rounded-xl border border-navy-700 bg-navy-800/50 p-4 animate-pulse">
+        <div className="h-4 w-48 bg-navy-700 rounded mb-3" />
+        <div className="h-8 w-64 bg-navy-700 rounded mb-2" />
+        <div className="h-4 w-96 bg-navy-700 rounded" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mb-4 flex items-center gap-3 p-4 bg-red-900/20 border border-red-700/40 rounded-xl">
+        <span className="text-red-400 text-sm flex-1">{error}</span>
+        <button
+          className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors"
+          onClick={fetchWeather}
+        >
+          Réessayer
+        </button>
+      </div>
+    );
+  }
+
+  if (!weather || tideData.length === 0) return null;
 
   const day = tideData[selectedDay];
+  if (!day) return null;
+
   const windows = computeEtaleWindows(day.extremes, weather, selectedDay);
   const best = windows.length > 0 ? windows.reduce((a, b) => (b.score > a.score ? b : a)) : null;
-
-  const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-  const MONTHS_FR = ['jan', 'fév', 'mar', 'avr', 'mai', 'jun', 'jul', 'aoû', 'sep', 'oct', 'nov', 'déc'];
-  const formatDay = (iso: string) => {
-    const d = new Date(iso + 'T00:00:00');
-    return `${DAYS_FR[d.getDay()]} ${d.getDate()} ${MONTHS_FR[d.getMonth()]}`;
-  };
 
   const quality = best ? qualityLabel(best.score) : null;
 
   return (
     <div className="mb-4">
-      {/* Day selector tabs */}
-      <div className="flex gap-1.5 mb-3 flex-wrap">
-        {tideData.map((d, i) => (
-          <button
-            key={d.date}
-            onClick={() => setSelectedDay(i)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              selectedDay === i ? 'bg-ocean-500 text-white' : 'bg-navy-800 text-gray-400 hover:bg-navy-700'
-            }`}
-          >
-            {formatDay(d.date)}
-          </button>
-        ))}
-      </div>
-
       {/* Decision card */}
       <div className={`rounded-xl border p-4 ${quality?.bg ?? 'bg-navy-800 border-navy-600'}`}>
         <div className="flex flex-col lg:flex-row lg:items-start gap-4">
@@ -205,7 +212,7 @@ const DiveDecisionBanner: React.FC = () => {
                 <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Meilleur créneau du jour</span>
                 {!best.isDaylight && <span className="text-xs text-amber-500">⚠️ hors jour</span>}
               </div>
-              <div className="flex items-baseline gap-3 mb-2">
+              <div className="flex items-baseline gap-3 mb-2 flex-wrap">
                 <span className="text-2xl font-bold text-white">
                   {formatTime(best.windowStart)} – {formatTime(best.windowEnd)}
                 </span>
