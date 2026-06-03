@@ -221,7 +221,15 @@ const WeatherWidget: React.FC = () => {
       )}
 
       {error && (
-        <div className="text-red-400 text-sm p-3 bg-red-900/20 rounded-lg">{error}</div>
+        <div className="flex items-center gap-3 p-3 bg-red-900/20 border border-red-700/40 rounded-lg mb-3">
+          <span className="text-red-400 text-sm flex-1">{error}</span>
+          <button
+            className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors"
+            onClick={() => fetchWeather(location.lat, location.lon, location.name)}
+          >
+            Réessayer
+          </button>
+        </div>
       )}
 
       {weather?.isMock && !loading && (

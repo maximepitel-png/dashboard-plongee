@@ -38,18 +38,20 @@ function daysUntil(dateStr: string): number {
 const ClubDivesWidget: React.FC = () => {
   const [data, setData] = useState<ClubData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchDives = async (refresh = false) => {
     if (refresh) setRefreshing(true);
     else setLoading(true);
+    setFetchError(null);
     try {
       const res = refresh
         ? await axios.post('/api/club/refresh')
         : await axios.get('/api/club');
       setData(res.data);
     } catch {
-      setData({ dives: [], lastUpdated: '', error: 'Impossible de contacter le serveur' });
+      setFetchError('Impossible de contacter le serveur');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -72,7 +74,19 @@ const ClubDivesWidget: React.FC = () => {
         </button>
       </div>
 
-      {data?.error && (
+      {fetchError && !loading && (
+        <div className="flex items-center gap-3 p-3 bg-red-900/20 border border-red-700/40 rounded-lg mb-3">
+          <span className="text-red-400 text-sm flex-1">{fetchError}</span>
+          <button
+            className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors"
+            onClick={() => fetchDives()}
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
+
+      {data?.error && !fetchError && (
         <div className="mb-3 text-yellow-400 text-xs bg-yellow-900/20 border border-yellow-900/30 rounded-lg p-2 flex items-start gap-2">
           <span>⚠️</span>
           <span>{data.error} — données de démonstration affichées</span>

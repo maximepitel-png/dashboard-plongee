@@ -8,7 +8,6 @@ import axios from 'axios';
 const DIVABILITY_CONFIG = {
   wind: {
     maxPts: 25,
-    // [seuil_kt, pts] — au-delà du dernier seuil : 0 pt
     thresholds: [
       { below: 8,  pts: 25 },
       { below: 12, pts: 20 },
@@ -28,7 +27,6 @@ const DIVABILITY_CONFIG = {
   },
   clarity: {
     maxPts: 20,
-    // Proxy précipitation surface (mm/h)
     thresholds: [
       { below: 0.01, pts: 20 },
       { below: 0.5,  pts: 15 },
@@ -38,18 +36,16 @@ const DIVABILITY_CONFIG = {
   },
   temperature: {
     maxPts: 10,
-    // SST en °C
     thresholds: [
       { below: 999, pts: 10, above: 16 },
       { below: 16,  pts: 8,  above: 12 },
       { below: 12,  pts: 6,  above: 10 },
       { below: 10,  pts: 4,  above: 8  },
     ],
-    fallback: 2, // < 8°C combinaison étanche
+    fallback: 2,
   },
   current: {
     maxPts: 15,
-    // Courant en m/s (ocean_current_velocity)
     thresholds: [
       { below: 0.3, pts: 15 },
       { below: 0.6, pts: 12 },
@@ -120,24 +116,20 @@ function computeDivability(
   waveHeight: number,
   precipitation: number,
   seaTemp: number,
-  currentMs: number,  // ocean current in m/s
+  currentMs: number,
 ): DivabilityScore {
   const cfg = DIVABILITY_CONFIG;
 
   const windScore = scoreFromThresholds(windKnots, cfg.wind.thresholds);
   const waveScore = scoreFromThresholds(waveHeight, cfg.waves.thresholds);
-
-  // Clarté estimée : proxy précip surface. Pénalise la pluie (ruissellement, sédiments Orne).
   const clarityScore = scoreFromThresholds(precipitation, cfg.clarity.thresholds);
 
-  // Température : SST surface (≠ profondeur sous thermocline)
   let tempScore = cfg.temperature.fallback;
   if (seaTemp >= 16) tempScore = 10;
   else if (seaTemp >= 12) tempScore = 8;
   else if (seaTemp >= 10) tempScore = 6;
   else if (seaTemp >= 8) tempScore = 4;
 
-  // Courant en m/s → remplace le coefficient de marée dans l'indice
   const currentScore = scoreFromThresholds(currentMs, cfg.current.thresholds);
 
   const total = windScore + waveScore + clarityScore + tempScore + currentScore;
@@ -164,11 +156,11 @@ function computeDivability(
   };
 }
 
-interface DivabilityWidgetProps {
-  selectedDate: string; // "YYYY-MM-DD" from parent day selector, "" = today
+interface Props {
+  selectedDate: string; // "YYYY-MM-DD" ou "" pour aujourd'hui
 }
 
-const DivabilityWidget: React.FC<DivabilityWidgetProps> = ({ selectedDate }) => {
+const DivabilityWidget: React.FC<Props> = ({ selectedDate }) => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [tidalImpact, setTidalImpact] = useState<TidalImpact | null>(null);
   const [loading, setLoading] = useState(true);
@@ -186,20 +178,26 @@ const DivabilityWidget: React.FC<DivabilityWidgetProps> = ({ selectedDate }) => 
       setWeather(weatherRes.data);
       setTidalImpact(tideRes.data);
     } catch {
-      setError('Impossible de calculer l\'indice de plongeabilité');
+      setError('Impossible de charger les données de plongeabilité');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // When selectedDate changes from parent, refetch tidal impact
+  useEffect(() => {
+    if (!weather) return;
     if (selectedDate) {
       const ts = new Date(selectedDate + 'T12:00:00').getTime();
-      fetchData(ts);
-    } else {
-      fetchData();
+      axios.get(`/api/tides/impact?timestamp=${ts}`)
+        .then((res) => setTidalImpact(res.data))
+        .catch(() => {});
     }
-  }, [fetchData, selectedDate]);
+  }, [selectedDate, weather]);
 
   useEffect(() => {
     if (!weather || !tidalImpact) return;
@@ -247,13 +245,6 @@ const DivabilityWidget: React.FC<DivabilityWidgetProps> = ({ selectedDate }) => 
         <span>Indice de Plongeabilité</span>
       </div>
 
-      {/* Label de la date sélectionnée (contrôlé par le sélecteur global) */}
-      {selectedDate && (
-        <p className="text-xs text-gray-500 mb-4">
-          Prévision pour le <span className="text-ocean-400">{new Date(selectedDate + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-        </p>
-      )}
-
       {loading && (
         <div className="flex items-center justify-center h-32 text-gray-500 animate-pulse">
           Calcul en cours...
@@ -261,11 +252,21 @@ const DivabilityWidget: React.FC<DivabilityWidgetProps> = ({ selectedDate }) => 
       )}
 
       {error && !loading && (
-        <div className="flex items-center gap-3 p-3 bg-red-900/20 rounded-lg mb-2">
+        <div className="flex items-center gap-3 p-3 bg-red-900/20 border border-red-700/40 rounded-lg mb-3">
           <span className="text-red-400 text-sm flex-1">{error}</span>
-          <button onClick={() => fetchData(selectedDate ? new Date(selectedDate + 'T12:00:00').getTime() : undefined)} className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors">
+          <button
+            className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors"
+            onClick={() => fetchData()}
+          >
             Réessayer
           </button>
+        </div>
+      )}
+
+      {!loading && !error && !score && (
+        <div className="text-center py-8 text-gray-500">
+          <p className="text-3xl mb-2">🎯</p>
+          <p>Aucune donnée disponible</p>
         </div>
       )}
 
@@ -274,14 +275,12 @@ const DivabilityWidget: React.FC<DivabilityWidgetProps> = ({ selectedDate }) => 
           {/* Circular gauge */}
           <div className="relative mb-4">
             <svg width="140" height="140" viewBox="0 0 140 140">
-              {/* Background circle */}
               <circle
                 cx="70" cy="70" r="54"
                 fill="none"
                 stroke="#0a1628"
                 strokeWidth="12"
               />
-              {/* Progress arc */}
               <circle
                 cx="70" cy="70" r="54"
                 fill="none"
@@ -293,7 +292,6 @@ const DivabilityWidget: React.FC<DivabilityWidgetProps> = ({ selectedDate }) => 
                 transform="rotate(-90 70 70)"
                 style={{ transition: 'stroke-dashoffset 0.6s ease, stroke 0.3s ease' }}
               />
-              {/* Score text */}
               <text x="70" y="62" textAnchor="middle" className="text-white" fill="white" fontSize="28" fontWeight="bold">
                 {score.total}
               </text>
