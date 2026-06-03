@@ -71,7 +71,9 @@ function computeDivability(
   else if (waveHeight < 1.5) waveScore = 4;
   else waveScore = 0;
 
-  // Visibility score (0-20 pts) based on precipitation
+  // Clarté estimée (0-20 pts) : proxy basé sur la précipitation cumulée surface.
+  // Pas de donnée de visibilité sous-marine disponible gratuitement.
+  // On pénalise la pluie forte (remontée de sédiments, ruissellement estuaire Orne).
   let visScore = 0;
   if (precipitation === 0) visScore = 20;
   else if (precipitation < 0.5) visScore = 15;
@@ -117,7 +119,7 @@ function computeDivability(
     details: [
       { label: 'Vent', value: `${Math.round(windKnots)} kt`, score: windScore },
       { label: 'Vagues', value: `${waveHeight.toFixed(1)} m`, score: waveScore },
-      { label: 'Précip. surface', value: precipitation === 0 ? 'Aucune' : `${precipitation.toFixed(1)} mm`, score: visScore, note: 'proxy surface — ≠ visibilité sous-marine' },
+      { label: 'Clarté estimée', value: precipitation === 0 ? 'Favorable' : `${precipitation.toFixed(1)} mm/h`, score: visScore, note: 'proxy précip. surface — ≠ visibilité sous-marine' },
       { label: 'Temp. mer', value: `${seaTemp.toFixed(1)}°C`, score: tempScore },
       { label: 'Coeff. marée', value: `${tidalCoeff}`, score: tidalScore },
     ],
@@ -311,11 +313,18 @@ const DivabilityWidget: React.FC = () => {
               </div>
               <div className="flex items-center gap-1.5 text-gray-400">
                 <span>⚓</span>
-                <span>Coefficient {tidalImpact.coefficient}</span>
+                <span>Coeff. ~{tidalImpact.coefficient} (estimé)</span>
               </div>
             </div>
           )}
         </div>
+      )}
+
+      {/* Source footer */}
+      {score && !loading && (
+        <p className="text-xs text-gray-700 mt-3 pt-2 border-t border-navy-800">
+          Source · Open-Meteo + modèle harmonique local · Calcul indicatif, seuils arbitraires · Calculé à {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+        </p>
       )}
     </div>
   );

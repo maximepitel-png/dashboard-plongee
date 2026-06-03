@@ -113,7 +113,7 @@ const TidesWidget: React.FC = () => {
         <span>Marées — Ouistreham</span>
         {currentDay && (
           <span className="ml-auto text-sm font-normal" style={{ color: getCoefficientColor(currentDay.coefficient) }}>
-            Coefficient {currentDay.coefficient}
+            Coeff. ~{currentDay.coefficient} <span className="text-gray-500 text-xs">(estimé)</span>
           </span>
         )}
       </div>
@@ -144,7 +144,7 @@ const TidesWidget: React.FC = () => {
               >
                 <span className="block">{formatDate(day.date)}</span>
                 <span className="block" style={{ color: getCoefficientColor(day.coefficient) }}>
-                  C{day.coefficient}
+                  ~C{day.coefficient}
                 </span>
               </button>
             ))}
@@ -236,7 +236,7 @@ const TidesWidget: React.FC = () => {
               {/* Coefficient bar */}
               <div className="mt-3 bg-navy-900 rounded-lg p-2.5">
                 <div className="flex justify-between text-xs text-gray-400 mb-1">
-                  <span>Coefficient de marée: <strong style={{ color: getCoefficientColor(currentDay.coefficient) }}>{currentDay.coefficient}</strong></span>
+                  <span>Coeff. marée estimé: <strong style={{ color: getCoefficientColor(currentDay.coefficient) }}>~{currentDay.coefficient}</strong></span>
                   <span>{currentDay.coefficient <= 70 ? 'Morte-eau' : currentDay.coefficient >= 95 ? 'Vive-eau' : 'Modérée'}</span>
                 </div>
                 <div className="h-2 bg-navy-700 rounded-full overflow-hidden">
@@ -252,9 +252,21 @@ const TidesWidget: React.FC = () => {
                   <span>20</span><span>70</span><span>95</span><span>120</span>
                 </div>
               </div>
+
+              {/* Reference & disclaimer */}
+              <p className="text-xs text-gray-600 mt-3 text-center">
+                Hauteurs en mètres au-dessus du Zéro Hydrographique (ZH) · Calcul harmonique estimé · <span className="text-amber-600/70">Indicatif, pas pour la navigation</span>
+              </p>
             </>
           )}
         </>
+      )}
+
+      {/* Source footer */}
+      {!loading && (
+        <p className="text-xs text-gray-700 mt-3 pt-2 border-t border-navy-800">
+          Source · Modèle harmonique local (constituants SHOM Ouistreham) · Calculé le {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+        </p>
       )}
     </div>
   );

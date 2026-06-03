@@ -265,6 +265,13 @@ const WeatherWidget: React.FC = () => {
           </div>
         </>
       )}
+
+      {/* Source footer */}
+      {weather && !loading && (
+        <p className="text-xs text-gray-700 mt-3 pt-2 border-t border-navy-800">
+          Source · Open-Meteo (Forecast + Marine API){weather.isMock ? ' · ⚠️ données fictives' : ` · Mis à jour à ${new Date(weather.current.time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+        </p>
+      )}
     </div>
   );
 };
