@@ -45,7 +45,7 @@ export interface DayTides {
 // ── API-maree.fr response types ───────────────────────────────────────────────
 
 interface MareeApiSite {
-  id: string;   // slug used in /water-levels
+  site_id: string; // slug used in /water-levels
   name: string;
   latitude?: number;
   longitude?: number;
@@ -134,7 +134,7 @@ async function resolveOuistrehamSlug(): Promise<string> {
       s.name.toLowerCase().replace(/[-\s]/g, '').includes('ouistreham')
     );
     if (byName) {
-      resolvedSiteSlug = byName.id;
+      resolvedSiteSlug = byName.site_id;
       console.log(`[tides] Resolved Ouistreham → site slug "${resolvedSiteSlug}" (by name)`);
       return resolvedSiteSlug;
     }
@@ -146,7 +146,7 @@ async function resolveOuistrehamSlug(): Promise<string> {
         dist(s.latitude!, s.longitude!, OUISTREHAM_LAT, OUISTREHAM_LON) <
         dist(best.latitude!, best.longitude!, OUISTREHAM_LAT, OUISTREHAM_LON) ? s : best
       );
-      resolvedSiteSlug = nearest.id;
+      resolvedSiteSlug = nearest.site_id;
       console.log(`[tides] Resolved Ouistreham → site slug "${resolvedSiteSlug}" (by proximity)`);
       return resolvedSiteSlug;
     }
