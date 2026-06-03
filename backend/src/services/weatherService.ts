@@ -52,6 +52,7 @@ export interface WeatherData {
     lon: number;
     name: string;
   };
+  marineHorizonDate?: string;
   isMock?: boolean;
 }
 
@@ -64,6 +65,7 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
   const windDir: number[] = [];
   const precip: number[] = [];
   const wcode: number[] = [];
+  const marineTimes: string[] = [];
   const waveH: number[] = [];
   const waveDir: number[] = [];
   const wavePeriod: number[] = [];
@@ -77,7 +79,7 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
   const currentDir: number[] = [];
   const sst: number[] = [];
 
-  for (let i = 0; i < 168; i++) {
+  for (let i = 0; i < 360; i++) {
     const t = new Date(now.getTime() + i * 3600000);
     times.push(t.toISOString().slice(0, 16));
     const w = +(8 + Math.sin(i / 24) * 6 + Math.random() * 3).toFixed(1);
@@ -87,25 +89,28 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
     windDir.push(Math.floor(200 + Math.sin(i / 18) * 60 + Math.random() * 20));
     precip.push(+(Math.random() < 0.2 ? Math.random() * 2 : 0).toFixed(1));
     wcode.push(Math.random() < 0.6 ? 1 : Math.random() < 0.5 ? 3 : 61);
-    const wh = +(0.4 + Math.sin(i / 20) * 0.3 + Math.random() * 0.2).toFixed(2);
-    waveH.push(wh);
-    waveDir.push(Math.floor(320 + Math.random() * 40));  // NW/N — onshore Normandie
-    wavePeriod.push(+(6 + Math.random() * 3).toFixed(1));
-    swellH.push(+(wh * 0.6).toFixed(2));
-    swellDir.push(Math.floor(310 + Math.random() * 30));
-    swellPeriod.push(+(9 + Math.random() * 4).toFixed(1));
-    windWaveH.push(+(wh * 0.4).toFixed(2));
-    windWaveDir.push(Math.floor(200 + Math.random() * 40));
-    windWavePeriod.push(+(4 + Math.random() * 2).toFixed(1));
-    // Tidal current: oscillates with ~12.4h period, max ~1.2 m/s in Manche
-    currentVel.push(+(0.6 + Math.sin(i * (2 * Math.PI / 12.4)) * 0.5 + Math.random() * 0.1).toFixed(2));
-    currentDir.push(Math.floor(i % 13 < 6 ? 50 + Math.random() * 20 : 230 + Math.random() * 20));
-    sst.push(+(13 + Math.sin(i / 48) * 1.5).toFixed(1));
+    if (i < 168) {
+      marineTimes.push(t.toISOString().slice(0, 16));
+      const wh = +(0.4 + Math.sin(i / 20) * 0.3 + Math.random() * 0.2).toFixed(2);
+      waveH.push(wh);
+      waveDir.push(Math.floor(320 + Math.random() * 40));  // NW/N — onshore Normandie
+      wavePeriod.push(+(6 + Math.random() * 3).toFixed(1));
+      swellH.push(+(wh * 0.6).toFixed(2));
+      swellDir.push(Math.floor(310 + Math.random() * 30));
+      swellPeriod.push(+(9 + Math.random() * 4).toFixed(1));
+      windWaveH.push(+(wh * 0.4).toFixed(2));
+      windWaveDir.push(Math.floor(200 + Math.random() * 40));
+      windWavePeriod.push(+(4 + Math.random() * 2).toFixed(1));
+      // Tidal current: oscillates with ~12.4h period, max ~1.2 m/s in Manche
+      currentVel.push(+(0.6 + Math.sin(i * (2 * Math.PI / 12.4)) * 0.5 + Math.random() * 0.1).toFixed(2));
+      currentDir.push(Math.floor(i % 13 < 6 ? 50 + Math.random() * 20 : 230 + Math.random() * 20));
+      sst.push(+(13 + Math.sin(i / 48) * 1.5).toFixed(1));
+    }
   }
 
   const sunrises: string[] = [];
   const sunsets: string[] = [];
-  for (let d = 0; d < 7; d++) {
+  for (let d = 0; d < 15; d++) {
     const day = new Date(now.getTime() + d * 86400000);
     const dateStr = day.toISOString().split('T')[0];
     sunrises.push(`${dateStr}T06:05`);
@@ -132,9 +137,10 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
       weathercode: wcode,
     },
     daily: { sunrise: sunrises, sunset: sunsets },
+    marineHorizonDate: marineTimes[marineTimes.length - 1] ?? new Date().toISOString(),
     marine: {
       hourly: {
-        time: times,
+        time: marineTimes,
         wave_height: waveH,
         wave_direction: waveDir,
         wave_period: wavePeriod,
@@ -168,7 +174,7 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
           current: 'temperature_2m,windspeed_10m,winddirection_10m,weathercode,precipitation,windgusts_10m',
           hourly: 'temperature_2m,windspeed_10m,windgusts_10m,winddirection_10m,precipitation,weathercode',
           daily: 'sunrise,sunset',
-          forecast_days: 7,
+          forecast_days: 16,
           wind_speed_unit: 'kn',
           timezone: 'Europe/Paris',
         },
@@ -206,6 +212,7 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
         sunset: weatherRes.data.daily.sunset,
       },
       marine: { hourly: marineRes.data.hourly },
+      marineHorizonDate: marineRes.data.hourly.time[marineRes.data.hourly.time.length - 1] ?? new Date().toISOString(),
       location: { lat, lon, name: locationName },
     };
 

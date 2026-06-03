@@ -5,7 +5,7 @@ const router = Router();
 
 router.get('/', (_req: Request, res: Response) => {
   try {
-    const days = 7;
+    const days = 15;
     const data = getTideData(days);
     return res.json(data);
   } catch (err) {
