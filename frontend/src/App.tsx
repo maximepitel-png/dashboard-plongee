@@ -71,6 +71,55 @@ function getDayWindRange(date: string, weather: any): { min: number; max: number
 
 const DEFAULT_LOCATION = { lat: 49.2796, lon: -0.2602, name: 'Ouistreham' };
 
+interface GeoSuggestion {
+  id: number;
+  name: string;
+  displayName: string; // "Granville — Manche, France"
+  lat: number;
+  lon: number;
+}
+
+/** Parse "City, Region" input → { term, region } */
+function parseSearchInput(input: string): { term: string; region: string } {
+  const comma = input.indexOf(',');
+  if (comma === -1) return { term: input.trim(), region: '' };
+  return { term: input.slice(0, comma).trim(), region: input.slice(comma + 1).trim().toLowerCase() };
+}
+
+async function fetchSuggestions(input: string): Promise<GeoSuggestion[]> {
+  if (input.length < 2) return [];
+  const { term, region } = parseSearchInput(input);
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(term)}&count=10&language=fr&format=json`;
+  const res = await axios.get(url);
+  const results: Array<{
+    id: number; name: string; latitude: number; longitude: number;
+    admin1?: string; admin2?: string; admin3?: string; country?: string;
+  }> = res.data.results ?? [];
+
+  // Build display names and optionally rank by region match
+  const suggestions: GeoSuggestion[] = results.map((r) => {
+    const parts = [r.admin2 ?? r.admin3 ?? r.admin1, r.country].filter(Boolean);
+    return {
+      id: r.id,
+      name: r.name,
+      displayName: parts.length > 0 ? `${r.name} — ${parts.join(', ')}` : r.name,
+      lat: r.latitude,
+      lon: r.longitude,
+    };
+  });
+
+  // If region given, sort matching results first
+  if (region) {
+    suggestions.sort((a, b) => {
+      const aMatch = a.displayName.toLowerCase().includes(region) ? 0 : 1;
+      const bMatch = b.displayName.toLowerCase().includes(region) ? 0 : 1;
+      return aMatch - bMatch;
+    });
+  }
+
+  return suggestions.slice(0, 6);
+}
+
 const AppInner: React.FC = () => {
   const { selectedSite } = useDiveSites();
   const { formatWind, formatTemp } = useUnits();
@@ -106,6 +155,10 @@ const AppInner: React.FC = () => {
   const [weatherError, setWeatherError] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [searching, setSearching] = React.useState(false);
+  const [suggestions, setSuggestions] = React.useState<GeoSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const searchDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchContainerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -148,23 +201,49 @@ const AppInner: React.FC = () => {
     fetchWeather();
   }, [fetchWeather]);
 
-  const handleLocationSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    setSearching(true);
-    try {
-      const res = await axios.get(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery)}&count=5&language=fr&format=json`
-      );
-      if (res.data.results && res.data.results.length > 0) {
-        const r = res.data.results[0];
-        setLocation({ lat: r.latitude, lon: r.longitude, name: r.name });
-        setSearchQuery('');
+  // Close suggestions when clicking outside
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
       }
-    } catch {
-      // silent fail
-    } finally {
-      setSearching(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleSearchInput = (value: string) => {
+    setSearchQuery(value);
+    setShowSuggestions(true);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (value.length < 2) { setSuggestions([]); return; }
+    searchDebounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const results = await fetchSuggestions(value);
+        setSuggestions(results);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  };
+
+  const handleSelectSuggestion = (s: GeoSuggestion) => {
+    setLocation({ lat: s.lat, lon: s.lon, name: s.displayName });
+    setSearchQuery('');
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
+
+  // Keep form submit as fallback: if one suggestion → apply it; else show list
+  const handleLocationSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (suggestions.length === 1) {
+      handleSelectSuggestion(suggestions[0]);
+    } else if (suggestions.length > 1) {
+      setShowSuggestions(true);
     }
   };
 
@@ -189,36 +268,60 @@ const AppInner: React.FC = () => {
           </div>
 
           {/* Location display + search */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0" ref={searchContainerRef}>
             <div className="flex items-center gap-2 mb-1">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00b4d8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
               <h1 className="text-lg font-bold text-ocean-400 leading-tight truncate">{location.name}</h1>
               {weatherLoading && <span className="text-xs text-gray-600 animate-pulse">chargement…</span>}
             </div>
-            <form onSubmit={handleLocationSearch} className="flex gap-1.5">
-              <input
-                type="text"
-                placeholder="Changer de lieu…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="input flex-1 text-xs py-1 h-7 min-w-0"
-              />
-              <button type="submit" disabled={searching} className="btn-primary text-xs px-2 py-1 h-7 shrink-0">
-                {searching ? '…' : (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                )}
-              </button>
-              {location.name !== DEFAULT_LOCATION.name && (
-                <button
-                  type="button"
-                  className="btn-ghost text-xs px-2 py-1 h-7 shrink-0"
-                  onClick={() => { setLocation(DEFAULT_LOCATION); setSearchQuery(''); }}
-                  title="Retour à Ouistreham"
-                >
-                  ↩
+            <div className="relative">
+              <form onSubmit={handleLocationSearch} className="flex gap-1.5">
+                <input
+                  type="text"
+                  placeholder="Changer de lieu… (ex. Granville, Manche)"
+                  value={searchQuery}
+                  onChange={(e) => handleSearchInput(e.target.value)}
+                  onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                  className="input flex-1 text-xs py-1 h-7 min-w-0"
+                  autoComplete="off"
+                />
+                <button type="submit" disabled={searching} className="btn-primary text-xs px-2 py-1 h-7 shrink-0">
+                  {searching ? '…' : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                  )}
                 </button>
+                {location.name !== DEFAULT_LOCATION.name && (
+                  <button
+                    type="button"
+                    className="btn-ghost text-xs px-2 py-1 h-7 shrink-0"
+                    onClick={() => { setLocation(DEFAULT_LOCATION); setSearchQuery(''); setSuggestions([]); }}
+                    title="Retour à Ouistreham"
+                  >
+                    ↩
+                  </button>
+                )}
+              </form>
+
+              {/* Autocomplete dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <ul className="absolute top-full left-0 right-0 mt-0.5 bg-navy-800 border border-navy-600 rounded-lg shadow-xl z-[200] overflow-hidden">
+                  {suggestions.map((s) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-navy-700 transition-colors"
+                        onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s); }}
+                      >
+                        <span className="text-white font-medium">{s.name}</span>
+                        {s.displayName !== s.name && (
+                          <span className="text-gray-400 ml-1">{s.displayName.slice(s.name.length)}</span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
-            </form>
+            </div>
           </div>
 
           {/* Units + clock */}
