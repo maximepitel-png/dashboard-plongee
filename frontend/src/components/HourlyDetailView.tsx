@@ -261,12 +261,13 @@ const TableMode: React.FC<{
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-navy-700/50" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+    <div className="overflow-x-auto rounded-lg border border-navy-700/50" style={{ maxHeight: '70vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <table className="border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
         <thead className="sticky top-0 z-20 bg-navy-900">
           <tr>
             <th className="sticky left-0 z-30 bg-navy-900 px-3 py-2 text-left text-xs text-gray-600 border-b border-navy-700" style={{ minWidth: '130px' }}>
               {date}
+              <span className="block text-xs text-gray-700 font-normal mt-0.5">Heures locales (Europe/Paris)</span>
             </th>
             {validHours.map(h => (
               <th key={h} className="px-2 py-2 text-xs text-gray-400 border-b border-navy-700 text-right font-mono" style={{ minWidth: '52px' }}>
@@ -685,7 +686,7 @@ const HourlyDetailView: React.FC<HourlyDetailViewProps> = ({
             }`}
           >
             {m.icon}
-            {m.label}
+            <span className="hidden sm:inline ml-1">{m.label}</span>
           </button>
         ))}
         <span className="ml-auto text-xs text-gray-600">{dayLabel}</span>

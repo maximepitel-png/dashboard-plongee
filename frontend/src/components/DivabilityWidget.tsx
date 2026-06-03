@@ -4,6 +4,7 @@ import { Target } from 'lucide-react';
 import { useUnits } from '../contexts/UnitContext';
 import { useSiteAdjustment, getSiteMultipliers } from '../contexts/SiteAdjustmentContext';
 import InfoTooltip from './InfoTooltip';
+import { forecastReliability } from '../utils/forecastReliability';
 
 /**
  * CONFIGURATION DU SCORING — modifier ici pour ajuster les seuils
@@ -237,6 +238,15 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
     setScore(computed);
   }, [weather, tidalImpact, selectedDate, multipliers]);
 
+  const dayIndex = React.useMemo(() => {
+    if (!selectedDate) return 0;
+    const today = new Date().toISOString().slice(0, 10);
+    const msPerDay = 86400000;
+    return Math.round((new Date(selectedDate).getTime() - new Date(today).getTime()) / msPerDay);
+  }, [selectedDate]);
+
+  const reliability = forecastReliability(dayIndex);
+
   const beyondMarine = marineHorizonDate
     ? new Date((selectedDate || new Date().toISOString().slice(0, 10)) + 'T12:00:00') > new Date(marineHorizonDate)
     : false;
@@ -347,6 +357,14 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
           >
             {score.verdict}
           </div>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs text-gray-500">Fiabilité prévision :</span>
+            <div className="flex-1 max-w-24 h-1.5 rounded-full bg-navy-800 overflow-hidden">
+              <div className="h-full rounded-full transition-all" style={{ width: `${reliability.pct}%`, backgroundColor: reliability.color }} />
+            </div>
+            <span className="text-xs font-medium" style={{ color: reliability.color }}>{reliability.label} ({reliability.pct}%)</span>
+          </div>
+
           {selectedSite && (
             <p className="text-xs text-ocean-400/70 mb-3 italic">Ajusté pour {selectedSite.name}</p>
           )}
@@ -404,9 +422,11 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
       )}
 
       {/* Source footer */}
-      {!beyondMarine && score && !loading && (
+      {score && !loading && (
         <p className="text-xs text-gray-700 mt-3 pt-2 border-t border-navy-800">
-          Source · Open-Meteo + modèle harmonique local · Calcul indicatif, seuils arbitraires · Calculé à {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+          ⚠️ Calcul indicatif — seuils arbitraires. Ne constitue pas une autorisation de mise à l'eau. Consulter MétéoFrance et les tables SHOM.
+          {' · '}Source : Open-Meteo + modèle harmonique local · Calculé à {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+          {' · '}Fiabilité prévision : {reliability.label}
         </p>
       )}
     </div>

@@ -237,9 +237,12 @@ const TidesWidget: React.FC<Props> = ({ selectedDay, tideData, tidesLoading, tid
       )}
 
       {!tidesLoading && (
-        <p className="text-xs text-gray-700 mt-3 pt-2 border-t border-navy-800">
-          Source · Modèle harmonique local (constituants SHOM Ouistreham) · Calculé le {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-        </p>
+        <>
+          <p className="text-xs text-gray-700 mb-1">⏰ Toutes les heures sont en heure locale (Europe/Paris)</p>
+          <p className="text-xs text-gray-700 mt-3 pt-2 border-t border-navy-800">
+            Source · Modèle harmonique local (constituants SHOM Ouistreham) · Calculé le {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </>
       )}
     </div>
   );

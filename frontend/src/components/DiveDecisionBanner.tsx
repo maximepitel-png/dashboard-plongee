@@ -240,6 +240,7 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
         {/* Disclaimer */}
         <p className="text-xs text-gray-600 mt-3 pt-2 border-t border-white/5 flex items-center gap-1">
           <AlertTriangle size={12} className="text-gray-600 shrink-0" /> Aide indicative uniquement — jamais une autorisation de mise à l'eau. Consulter MétéoFrance et les tables SHOM avant toute plongée.
+          {' · '}Heures en heure locale (Paris)
           {weather.isMock && <span className="text-amber-600/70"> · Données fictives (API indisponible)</span>}
         </p>
       </div>

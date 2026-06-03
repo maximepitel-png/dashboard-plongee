@@ -12,6 +12,7 @@ import { SiteAdjustmentProvider } from './contexts/SiteAdjustmentContext';
 import { useDiveSites } from './hooks/useDiveSites';
 import UnitSelector from './components/UnitSelector';
 import { computeDayDivabilityScore } from './utils/divabilityPerDay';
+import { forecastReliability } from './utils/forecastReliability';
 
 interface TideExtreme {
   time: string;
@@ -223,7 +224,7 @@ const AppInner: React.FC = () => {
             <>
               <div
                 className="flex gap-2 overflow-x-auto pb-1"
-                style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+                style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' } as React.CSSProperties}
               >
                 {tideData.map((d, i) => {
                   const beyondMarine = isDayBeyondMarine(d.date, marineHorizonDate);
@@ -245,6 +246,7 @@ const AppInner: React.FC = () => {
                       key={d.date}
                       onClick={() => setSelectedDay(i)}
                       style={{ flexShrink: 0, minWidth: '108px' }}
+                      title={`Fiabilité prévision : ${forecastReliability(i).label} (${forecastReliability(i).pct}%)`}
                       className={`relative rounded-xl px-3 py-2 text-left transition-all duration-150 ${
                         isSelected
                           ? 'bg-ocean-600/40 border border-ocean-400/60 shadow-lg shadow-ocean-900/30'
@@ -289,6 +291,19 @@ const AppInner: React.FC = () => {
                           {windRange.min}–{windRange.max} kt
                         </p>
                       )}
+
+                      {/* Reliability bar */}
+                      {(() => {
+                        const rel = forecastReliability(i);
+                        return (
+                          <div className="flex items-center gap-1 mt-1">
+                            <div className="flex-1 h-0.5 rounded-full bg-navy-700 overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${rel.pct}%`, backgroundColor: rel.color }} />
+                            </div>
+                            <span className="text-xs shrink-0" style={{ color: rel.color }}>{rel.pct}%</span>
+                          </div>
+                        );
+                      })()}
 
                       {/* Air temp + coefficient */}
                       <div className="flex items-center justify-between mt-0.5">
