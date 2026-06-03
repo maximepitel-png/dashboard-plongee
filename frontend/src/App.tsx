@@ -1,6 +1,6 @@
 import React from 'react';
 import axios from 'axios';
-import WeatherWidget from './components/WeatherWidget';
+import HourlyDetailView from './components/HourlyDetailView';
 import DivabilityWidget from './components/DivabilityWidget';
 import TidesWidget from './components/TidesWidget';
 import ClubDivesWidget from './components/ClubDivesWidget';
@@ -146,6 +146,7 @@ const AppInner: React.FC = () => {
     d.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const selectedDate = tideData[selectedDay]?.date ?? '';
+  const dayTides = tideData[selectedDay] ?? null;
   const marineHorizonDate = weather?.marineHorizonDate ?? null;
 
   return (
@@ -329,13 +330,15 @@ const AppInner: React.FC = () => {
 
         {/* Top row: Weather + Divability */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          <WeatherWidget
+          <HourlyDetailView
             weather={weather}
             weatherLoading={weatherLoading}
             weatherError={weatherError}
             onRetry={fetchWeather}
             selectedDay={selectedDay}
             location={location}
+            dayTides={dayTides}
+            marineHorizonDate={marineHorizonDate}
           />
           <DivabilityWidget selectedDate={selectedDate} weather={weather} marineHorizonDate={marineHorizonDate} />
         </div>
