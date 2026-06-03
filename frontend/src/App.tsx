@@ -28,9 +28,11 @@ interface TidePoint {
 export interface DayTides {
   date: string;
   coefficient: number;
+  coefficientIsEstimate?: boolean;
   extremes: TideExtreme[];
   points: TidePoint[];
   isApproximate?: boolean;
+  source?: string;
 }
 
 const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
@@ -317,7 +319,7 @@ const AppInner: React.FC = () => {
                           <span className="text-xs text-gray-500">{formatTemp(airTemp)}</span>
                         )}
                         <span className="text-xs ml-auto" style={{ color: beyondMarine ? '#4b5563' : getCoefficientColor(d.coefficient) }}>
-                          {d.isApproximate ? '~' : ''}C{d.coefficient}
+                          {d.coefficientIsEstimate ? '~' : ''}C{d.coefficient}
                         </span>
                       </div>
                     </button>
@@ -331,8 +333,8 @@ const AppInner: React.FC = () => {
                 {tideData.some((d) => isDayBeyondMarine(d.date, marineHorizonDate)) && (
                   <span className="text-gray-700">* score partiel /45 (au-delà de ~7j, météo seule)</span>
                 )}
-                {tideData.some((d) => d.isApproximate) && (
-                  <span className="text-amber-700/70">~C coefficient approximatif — vérifier sur maree.info</span>
+                {tideData.some((d) => d.coefficientIsEstimate) && (
+                  <span className="text-amber-700/70">~C coefficient estimé — <a href="https://maree.shom.fr" target="_blank" rel="noopener noreferrer" className="underline">valeur officielle SHOM</a></span>
                 )}
               </div>
             </>

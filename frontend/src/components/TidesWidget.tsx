@@ -29,9 +29,11 @@ interface TidePoint {
 interface DayTides {
   date: string;
   coefficient: number;
+  coefficientIsEstimate?: boolean;
   extremes: TideExtreme[];
   points: TidePoint[];
   isApproximate?: boolean;
+  source?: string;
 }
 
 interface WeatherData {
@@ -372,7 +374,7 @@ const TidesWidget: React.FC<Props> = ({
             className="ml-auto text-sm font-normal"
             style={{ color: getCoefficientColor(currentDay.coefficient) }}
           >
-            Coeff.&nbsp;~{currentDay.coefficient}
+            Coeff.&nbsp;{currentDay.coefficientIsEstimate ? '~' : ''}{currentDay.coefficient}
             {currentDay.coefficient <= 70 && (
               <span className="text-gray-500 text-xs ml-1">morte-eau</span>
             )}
@@ -716,8 +718,8 @@ const TidesWidget: React.FC<Props> = ({
           <div className="mt-3 bg-navy-900 rounded-lg p-2.5">
             <div className="flex justify-between text-xs text-gray-400 mb-1">
               <span className="flex items-center gap-1">
-                Coefficient
-                <InfoTooltip text="Le coefficient de marée (20 à 120) mesure l'amplitude. En dessous de 70 : morte-eau (faibles courants). Au-dessus de 95 : vive-eau (forts courants, grande amplitude)." />
+                Coefficient estimé
+                <InfoTooltip text="Le coefficient de marée (20 à 120) mesure l'amplitude. En dessous de 70 : morte-eau (faibles courants). Au-dessus de 95 : vive-eau (forts courants, grande amplitude). Valeur estimée — consultez maree.shom.fr pour le coefficient officiel." />
                 :{' '}
                 <strong style={{ color: getCoefficientColor(currentDay.coefficient) }}>
                   ~{currentDay.coefficient}
@@ -749,21 +751,40 @@ const TidesWidget: React.FC<Props> = ({
           </div>
 
           {/* ── Footer ── */}
-          {currentDay.isApproximate && (
-            <p className="text-xs text-amber-600/80 mt-2 text-center">
-              ~ données approximatives
-            </p>
-          )}
           <p className="text-xs text-gray-600 mt-2 text-center">
-            Hauteurs en mètres · ZH · Calcul harmonique ·{' '}
+            Hauteurs en mètres au-dessus du Zéro Hydrographique (ZH) ·{' '}
             <span className="text-amber-600/70">Indicatif, pas pour la navigation</span>
           </p>
         </>
       )}
 
       {!tidesLoading && (
-        <p className="text-xs text-gray-700 mt-2 pt-2 border-t border-navy-800">
-          Heures en heure locale (Europe/Paris) · Source : modèle harmonique SHOM Ouistreham
+        <p className="text-xs text-gray-700 mt-2 pt-2 border-t border-navy-800 leading-relaxed">
+          Heures en heure locale (Europe/Paris)
+          {' · '}
+          {currentDay?.coefficientIsEstimate && (
+            <span>
+              Coefficient estimé (non officiel) —{' '}
+              <a
+                href="https://maree.shom.fr"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-gray-500"
+              >
+                valeur officielle SHOM
+              </a>
+              {' · '}
+            </span>
+          )}
+          Hauteurs calculées à partir de composantes harmoniques Ifremer/PREVIMER, via{' '}
+          <a
+            href="https://api-maree.fr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-gray-500"
+          >
+            api-maree.fr
+          </a>
         </p>
       )}
     </div>
