@@ -7,7 +7,7 @@ import ClubDivesWidget from './components/ClubDivesWidget';
 import EquipmentWidget from './components/EquipmentWidget';
 import DiveDecisionBanner from './components/DiveDecisionBanner';
 import DiveSitesWidget from './components/DiveSitesWidget';
-import { UnitProvider } from './contexts/UnitContext';
+import { UnitProvider, useUnits } from './contexts/UnitContext';
 import { SiteAdjustmentProvider } from './contexts/SiteAdjustmentContext';
 import { useDiveSites } from './hooks/useDiveSites';
 import UnitSelector from './components/UnitSelector';
@@ -70,6 +70,7 @@ const DEFAULT_LOCATION = { lat: 49.2796, lon: -0.2602, name: 'Ouistreham' };
 
 const AppInner: React.FC = () => {
   const { selectedSite } = useDiveSites();
+  const { formatWind, formatTemp } = useUnits();
   const [currentTime, setCurrentTime] = React.useState(new Date());
   const [tideData, setTideData] = React.useState<DayTides[]>([]);
   const [tidesLoading, setTidesLoading] = React.useState(true);
@@ -286,11 +287,15 @@ const AppInner: React.FC = () => {
                       )}
 
                       {/* Wind range */}
-                      {windRange && (
-                        <p className="text-xs text-gray-500">
-                          {windRange.min}–{windRange.max} kt
-                        </p>
-                      )}
+                      {windRange && (() => {
+                        const unit = formatWind(0).includes('km') ? 'km/h' : 'kt';
+                        const conv = unit === 'km/h' ? (v: number) => Math.round(v * 1.852) : (v: number) => v;
+                        return (
+                          <p className="text-xs text-gray-500">
+                            {conv(windRange.min)}–{conv(windRange.max)} {unit}
+                          </p>
+                        );
+                      })()}
 
                       {/* Reliability bar */}
                       {(() => {
@@ -308,7 +313,7 @@ const AppInner: React.FC = () => {
                       {/* Air temp + coefficient */}
                       <div className="flex items-center justify-between mt-0.5">
                         {airTemp !== null && (
-                          <span className="text-xs text-gray-500">{airTemp}°</span>
+                          <span className="text-xs text-gray-500">{formatTemp(airTemp)}</span>
                         )}
                         <span className="text-xs ml-auto" style={{ color: beyondMarine ? '#4b5563' : getCoefficientColor(d.coefficient) }}>
                           C{d.coefficient}

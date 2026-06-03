@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useUnits } from '../contexts/UnitContext';
 import {
   ComposedChart, Line, Bar, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -203,6 +204,17 @@ const TableMode: React.FC<{
   selectedDay: number;
   marineHorizonDate: string | null;
 }> = ({ weather, dayTides, selectedDay, marineHorizonDate }) => {
+  const { formatWind, formatTemp } = useUnits();
+  const convertWind = (kt: number): number =>
+    formatWind(0).includes('km') ? Math.round(kt * 1.852) : Math.round(kt);
+  const windUnitLabel = formatWind(0).includes('km') ? 'km/h' : 'kt';
+  const tempUnitLabel = formatTemp(0).includes('F') ? '°F' : '°C';
+  const fmtTempNum = (c: number | null | undefined): string => {
+    if (c == null || isNaN(c)) return '—';
+    if (tempUnitLabel === '°F') return (c * 9 / 5 + 32).toFixed(1);
+    return c.toFixed(1);
+  };
+
   const date = (() => {
     const d = new Date();
     d.setDate(d.getDate() + selectedDay);
@@ -297,17 +309,17 @@ const TableMode: React.FC<{
             })}
           </tr>
           <tr>
-            <RowLabel label="Vitesse" unit="kt" />
+            <RowLabel label="Vitesse" unit={windUnitLabel} />
             {validHours.map(h => {
               const v = get(weather.hourly.windspeed_10m, h);
-              return <Cell key={h} value={fmt0(v)} bg={v != null ? windColor(v) : undefined} color={v != null ? windTextColor(v) : undefined} bold />;
+              return <Cell key={h} value={v != null ? convertWind(v).toString() : '—'} bg={v != null ? windColor(v) : undefined} color={v != null ? windTextColor(v) : undefined} bold />;
             })}
           </tr>
           <tr>
-            <RowLabel label="Rafales" unit="kt" />
+            <RowLabel label="Rafales" unit={windUnitLabel} />
             {validHours.map(h => {
               const v = get(weather.hourly.windgusts_10m, h);
-              return <Cell key={h} value={fmt0(v)} bg={v != null ? windColor(v) : undefined} color={v != null ? windTextColor(v) : undefined} />;
+              return <Cell key={h} value={v != null ? convertWind(v).toString() : '—'} bg={v != null ? windColor(v) : undefined} color={v != null ? windTextColor(v) : undefined} />;
             })}
           </tr>
 
@@ -436,25 +448,25 @@ const TableMode: React.FC<{
           {/* ── TEMPÉRATURE ── */}
           <GroupHeader label="Température" colspan={validHours.length} />
           <tr>
-            <RowLabel label="Air" unit="°C" />
+            <RowLabel label="Air" unit={tempUnitLabel} />
             {validHours.map(h => {
               const v = get(weather.hourly.temperature_2m, h);
-              return <Cell key={h} value={fmt1(v)} color="#e5e7eb" bold />;
+              return <Cell key={h} value={fmtTempNum(v)} color="#e5e7eb" bold />;
             })}
           </tr>
           <tr>
-            <RowLabel label="Ressentie" unit="°C" />
+            <RowLabel label="Ressentie" unit={tempUnitLabel} />
             {validHours.map(h => {
               const v = get(weather.hourly.apparent_temperature, h);
-              return <Cell key={h} value={fmt1(v)} color="#9ca3af" />;
+              return <Cell key={h} value={fmtTempNum(v)} color="#9ca3af" />;
             })}
           </tr>
           {!beyondMarine && (
             <tr>
-              <RowLabel label="Eau (surface)" unit="°C" />
+              <RowLabel label="Eau (surface)" unit={tempUnitLabel} />
               {validHours.map(h => {
                 const v = getM(weather.marine.hourly.sea_surface_temperature, h);
-                return <Cell key={h} value={fmt1(v)} color="#2dd4bf" />;
+                return <Cell key={h} value={fmtTempNum(v)} color="#2dd4bf" />;
               })}
             </tr>
           )}

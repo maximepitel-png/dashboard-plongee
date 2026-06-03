@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import InfoTooltip from './InfoTooltip';
+import { useUnits } from '../contexts/UnitContext';
 
 /**
  * ALGORITHME DE DÉCISION — Meilleure fenêtre de plongée du jour
@@ -147,6 +148,7 @@ interface Props {
 }
 
 const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, marineHorizonDate }) => {
+  const { formatWind } = useUnits();
   if (!weather || tideData.length === 0) return null;
 
   const day = tideData[selectedDay];
@@ -199,7 +201,7 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
             <p className="text-xs text-gray-400">
               Étale de {best.extremeType === 'high' ? 'pleine mer' : 'basse mer'} à {formatTime(best.extremeTime)}
               {' '}({best.extremeHeight.toFixed(2)} m)
-              {' · '}Vent {Math.round(best.wind)} kt
+              {' · '}Vent {formatWind(best.wind)}
               {' · '}Vagues {best.waves.toFixed(1)} m
             </p>
           </div>
@@ -226,7 +228,7 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
                 </span>
                 <span className="text-gray-400 shrink-0">{formatTime(w.extremeTime)}</span>
                 <span className="text-gray-600 shrink-0">{formatTime(w.windowStart)}–{formatTime(w.windowEnd)}</span>
-                <span className="shrink-0 text-gray-500">{Math.round(w.wind)} km/h · {w.waves.toFixed(1)} m</span>
+                <span className="shrink-0 text-gray-500">{formatWind(w.wind)} · {w.waves.toFixed(1)} m</span>
                 {!w.isDaylight && <span className="text-xs text-amber-500 shrink-0">🌙</span>}
                 <span className="ml-auto font-semibold shrink-0" style={{ color: q.color }}>{q.label}</span>
               </div>
