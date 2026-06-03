@@ -12,6 +12,9 @@ services:
       - PORT=3001
       - DATA_DIR=/app/data
       - FRONTEND_URL=http://localhost:3000
+      # Clé WorldTides pour marées précises (https://www.worldtides.info/developer)
+      # Décommentez et renseignez votre clé pour activer les marées officielles :
+      # - WORLDTIDES_API_KEY=votre_clé_ici
     volumes:
       - ./data:/app/data
     networks:

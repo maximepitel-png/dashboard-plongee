@@ -3,10 +3,9 @@ import { getTideData, getTidalImpact } from '../services/tidesService';
 
 const router = Router();
 
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', async (_req: Request, res: Response) => {
   try {
-    const days = 15;
-    const data = getTideData(days);
+    const data = await getTideData(15);
     return res.json(data);
   } catch (err) {
     console.error('Tides error:', err);
@@ -14,12 +13,12 @@ router.get('/', (_req: Request, res: Response) => {
   }
 });
 
-router.get('/impact', (req: Request, res: Response) => {
+router.get('/impact', async (req: Request, res: Response) => {
   try {
     const timestamp = req.query.timestamp
       ? parseInt(req.query.timestamp as string)
       : Date.now();
-    const impact = getTidalImpact(timestamp);
+    const impact = await getTidalImpact(timestamp);
     return res.json(impact);
   } catch (err) {
     console.error('Tidal impact error:', err);

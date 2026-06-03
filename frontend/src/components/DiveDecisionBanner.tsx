@@ -35,6 +35,7 @@ export interface DayTides {
   date: string;
   coefficient: number;
   extremes: TideExtreme[];
+  isApproximate?: boolean;
 }
 
 interface WeatherData {
@@ -238,9 +239,12 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
       </div>
 
       {/* Disclaimer */}
-      <p className="text-xs text-gray-600 mt-2 pt-2 border-t border-white/5 flex items-center gap-1">
+      <p className="text-xs text-gray-600 mt-2 pt-2 border-t border-white/5 flex items-center gap-1 flex-wrap">
         <AlertTriangle size={12} className="text-gray-600 shrink-0" /> Aide indicative uniquement — jamais une autorisation de mise à l'eau. Consulter MétéoFrance et les tables SHOM avant toute plongée.
         {' · '}Heures en heure locale (Paris)
+        {day.isApproximate && (
+          <span className="text-amber-600/70"> · Marées approximatives (modèle harmonique non calé SHOM) — vérifier sur <a href="https://maree.info" target="_blank" rel="noopener noreferrer" className="underline">maree.info</a></span>
+        )}
         {weather.isMock && <span className="text-amber-600/70"> · Données fictives (API indisponible)</span>}
       </p>
     </div>

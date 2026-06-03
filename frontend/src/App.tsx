@@ -30,6 +30,7 @@ export interface DayTides {
   coefficient: number;
   extremes: TideExtreme[];
   points: TidePoint[];
+  isApproximate?: boolean;
 }
 
 const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
@@ -316,7 +317,7 @@ const AppInner: React.FC = () => {
                           <span className="text-xs text-gray-500">{formatTemp(airTemp)}</span>
                         )}
                         <span className="text-xs ml-auto" style={{ color: beyondMarine ? '#4b5563' : getCoefficientColor(d.coefficient) }}>
-                          C{d.coefficient}
+                          {d.isApproximate ? '~' : ''}C{d.coefficient}
                         </span>
                       </div>
                     </button>
@@ -329,6 +330,9 @@ const AppInner: React.FC = () => {
                 <span>Score /100 (indice de plongeabilité à midi)</span>
                 {tideData.some((d) => isDayBeyondMarine(d.date, marineHorizonDate)) && (
                   <span className="text-gray-700">* score partiel /45 (au-delà de ~7j, météo seule)</span>
+                )}
+                {tideData.some((d) => d.isApproximate) && (
+                  <span className="text-amber-700/70">~C coefficient approximatif — vérifier sur maree.info</span>
                 )}
               </div>
             </>
