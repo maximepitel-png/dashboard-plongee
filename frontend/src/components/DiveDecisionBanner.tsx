@@ -172,78 +172,75 @@ const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, m
   const quality = best ? qualityLabel(best.score) : null;
 
   return (
-    <div className="mb-4">
-      {/* Decision card */}
-      <div className={`rounded-xl border p-4 ${quality?.bg ?? 'bg-navy-800 border-navy-600'}`}>
-        <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+    <div className={`rounded-xl border p-3 ${quality?.bg ?? 'bg-navy-800 border-navy-600'}`}>
+      <div className="flex flex-col gap-2">
 
-          {/* Best window */}
-          {best ? (
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center">
-                  Meilleur créneau du jour
-                  <InfoTooltip text="L'étale est la période de renverse du courant autour d'une pleine mer ou basse mer. Le courant est minimal pendant ±45 min autour de l'heure exacte — idéal pour plonger." />
-                </span>
-                {!best.isDaylight && <span className="text-xs text-amber-500">⚠️ hors jour</span>}
-              </div>
-              <div className="flex items-baseline gap-3 mb-2 flex-wrap">
-                <span className="text-2xl font-bold text-white">
-                  {formatTime(best.windowStart)} – {formatTime(best.windowEnd)}
-                </span>
-                <span
-                  className="text-sm font-semibold px-2 py-0.5 rounded-full"
-                  style={{ color: quality?.color, backgroundColor: quality?.color + '22' }}
-                >
-                  {quality?.label}
-                </span>
-              </div>
-              <p className="text-sm text-gray-300">
-                Étale de {best.extremeType === 'high' ? 'pleine mer' : 'basse mer'} à {formatTime(best.extremeTime)}
-                {' '}({best.extremeHeight.toFixed(2)} m)
-                {' · '}Vent {Math.round(best.wind)} kt
-                {' · '}Vagues {best.waves.toFixed(1)} m
-              </p>
+        {/* Best window */}
+        {best ? (
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center">
+                Meilleur créneau du jour
+                <InfoTooltip text="L'étale est la période de renverse du courant autour d'une pleine mer ou basse mer. Le courant est minimal pendant ±45 min autour de l'heure exacte — idéal pour plonger." />
+              </span>
+              {!best.isDaylight && <span className="text-xs text-amber-500">⚠️ hors jour</span>}
             </div>
-          ) : (
-            <div className="flex-1">
-              <p className="text-gray-400 text-sm">Aucune étale disponible pour ce jour.</p>
+            <div className="flex items-baseline gap-3 mb-2 flex-wrap">
+              <span className="text-xl font-bold text-white">
+                {formatTime(best.windowStart)} – {formatTime(best.windowEnd)}
+              </span>
+              <span
+                className="text-sm font-semibold px-2 py-0.5 rounded-full"
+                style={{ color: quality?.color, backgroundColor: quality?.color + '22' }}
+              >
+                {quality?.label}
+              </span>
             </div>
-          )}
+            <p className="text-xs text-gray-400">
+              Étale de {best.extremeType === 'high' ? 'pleine mer' : 'basse mer'} à {formatTime(best.extremeTime)}
+              {' '}({best.extremeHeight.toFixed(2)} m)
+              {' · '}Vent {Math.round(best.wind)} kt
+              {' · '}Vagues {best.waves.toFixed(1)} m
+            </p>
+          </div>
+        ) : (
+          <div className="flex-1">
+            <p className="text-gray-400 text-sm">Aucune étale disponible pour ce jour.</p>
+          </div>
+        )}
 
-          {/* All étale windows */}
-          <div className="flex flex-wrap gap-2 lg:flex-col lg:min-w-[200px]">
-            {windows.map((w, i) => (
+        {/* Compact étale list */}
+        <div className="flex flex-col gap-1 mt-2">
+          {windows.map((w, i) => {
+            const q = qualityLabel(w.score);
+            const isBest = best === w;
+            return (
               <div
                 key={i}
-                className={`rounded-lg px-3 py-2 text-xs border ${
-                  best === w
-                    ? 'border-ocean-400/50 bg-ocean-900/30'
-                    : 'border-navy-600 bg-navy-900/50'
+                className={`flex items-center gap-2 rounded-lg px-2 py-1 text-xs ${
+                  isBest ? 'bg-ocean-900/30 border border-ocean-400/30' : 'bg-navy-900/60'
                 }`}
               >
-                <p className="font-semibold text-gray-200">
-                  Étale {w.extremeType === 'high' ? 'PM' : 'BM'} · {formatTime(w.extremeTime)}
-                </p>
-                <p className="text-gray-400 mt-0.5">
-                  {formatTime(w.windowStart)}–{formatTime(w.windowEnd)}
-                </p>
-                <p className="text-gray-500 mt-0.5">
-                  {Math.round(w.wind)} kt · {w.waves.toFixed(1)} m
-                  {!w.isDaylight && ' · 🌙'}
-                </p>
+                <span className="font-medium text-gray-300 shrink-0">
+                  {w.extremeType === 'high' ? 'PM' : 'BM'}
+                </span>
+                <span className="text-gray-400 shrink-0">{formatTime(w.extremeTime)}</span>
+                <span className="text-gray-600 shrink-0">{formatTime(w.windowStart)}–{formatTime(w.windowEnd)}</span>
+                <span className="shrink-0 text-gray-500">{Math.round(w.wind)} km/h · {w.waves.toFixed(1)} m</span>
+                {!w.isDaylight && <span className="text-xs text-amber-500 shrink-0">🌙</span>}
+                <span className="ml-auto font-semibold shrink-0" style={{ color: q.color }}>{q.label}</span>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-
-        {/* Disclaimer */}
-        <p className="text-xs text-gray-600 mt-3 pt-2 border-t border-white/5 flex items-center gap-1">
-          <AlertTriangle size={12} className="text-gray-600 shrink-0" /> Aide indicative uniquement — jamais une autorisation de mise à l'eau. Consulter MétéoFrance et les tables SHOM avant toute plongée.
-          {' · '}Heures en heure locale (Paris)
-          {weather.isMock && <span className="text-amber-600/70"> · Données fictives (API indisponible)</span>}
-        </p>
       </div>
+
+      {/* Disclaimer */}
+      <p className="text-xs text-gray-600 mt-2 pt-2 border-t border-white/5 flex items-center gap-1">
+        <AlertTriangle size={12} className="text-gray-600 shrink-0" /> Aide indicative uniquement — jamais une autorisation de mise à l'eau. Consulter MétéoFrance et les tables SHOM avant toute plongée.
+        {' · '}Heures en heure locale (Paris)
+        {weather.isMock && <span className="text-amber-600/70"> · Données fictives (API indisponible)</span>}
+      </p>
     </div>
   );
 };

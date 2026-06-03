@@ -323,7 +323,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
         <div className="flex flex-col items-center">
           {/* Circular gauge */}
           <div className="relative mb-4">
-            <svg width="140" height="140" viewBox="0 0 140 140">
+            <svg width="120" height="120" viewBox="0 0 140 140">
               <circle
                 cx="70" cy="70" r="54"
                 fill="none"
@@ -370,7 +370,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
           )}
 
           {/* Score breakdown */}
-          <div className="w-full space-y-2">
+          <div className="w-full grid grid-cols-2 gap-x-4 gap-y-2">
             {score.details.map((d) => {
               const pct = (d.score / d.maxPts) * 100;
               const barColor = d.score >= d.maxPts * 0.7 ? '#2dd4bf' : d.score >= d.maxPts * 0.4 ? '#f59e0b' : '#ef4444';
@@ -381,28 +381,22 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
                 'Temp. mer': "Température de surface de la mer (SST). La température réelle en profondeur peut être de 2 à 5°C plus froide.",
               };
               return (
-                <div key={d.label}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400 w-24 shrink-0 flex items-center">
+                <div key={d.label} className="min-w-0">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className="text-xs text-gray-400 truncate flex-1 flex items-center">
                       {d.label}
                       {labelTooltip[d.label] && <InfoTooltip text={labelTooltip[d.label]} />}
                     </span>
-                    <div className="flex-1 bg-navy-900 rounded-full h-2.5 relative" title={`${d.score}/${d.maxPts} pts — ${qualLabel}`}>
-                      <div
-                        className="h-2.5 rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, backgroundColor: barColor }}
-                      />
-                    </div>
-                    <span className="text-xs text-gray-300 w-16 text-right shrink-0">{d.value}</span>
-                    <span className="text-xs w-20 text-right shrink-0" style={{ color: barColor }}>{qualLabel}</span>
+                    <span className="text-xs shrink-0" style={{ color: barColor }}>{d.value}</span>
                   </div>
-                  {d.note && (
-                    <p className="text-xs text-amber-500/70 ml-24 mt-0.5 italic">{d.note}</p>
-                  )}
+                  <div className="h-2 bg-navy-900 rounded-full overflow-hidden" title={`${d.score}/${d.maxPts} pts — ${qualLabel}`}>
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                  </div>
+                  {d.note && <p className="text-xs text-amber-500/70 mt-0.5 italic truncate">{d.note}</p>}
                 </div>
               );
             })}
-            <p className="text-xs text-gray-600 mt-1 italic">Barre courte = facteur défavorable · Barre pleine = facteur optimal</p>
+            <p className="text-xs text-gray-600 mt-1 italic col-span-2">Barre courte = facteur défavorable · Barre pleine = facteur optimal</p>
           </div>
 
           {/* Tidal info */}

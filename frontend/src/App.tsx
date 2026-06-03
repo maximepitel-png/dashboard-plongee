@@ -340,11 +340,18 @@ const AppInner: React.FC = () => {
       {/* Main content */}
       <main className="max-w-screen-2xl mx-auto px-4 py-6">
 
-        {/* Decision banner — meilleur créneau du jour */}
-        <DiveDecisionBanner selectedDay={selectedDay} tideData={tideData} weather={weather} marineHorizonDate={marineHorizonDate} />
+        {/* Row 1: Banner + Divability side by side, compact */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
+          <div className="lg:col-span-2">
+            <DiveDecisionBanner selectedDay={selectedDay} tideData={tideData} weather={weather} marineHorizonDate={marineHorizonDate} />
+          </div>
+          <div className="lg:col-span-3">
+            <DivabilityWidget selectedDate={selectedDate} weather={weather} marineHorizonDate={marineHorizonDate} />
+          </div>
+        </div>
 
-        {/* Top row: Weather + Divability */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        {/* Row 2: HourlyDetailView full width */}
+        <div className="mb-4">
           <HourlyDetailView
             weather={weather}
             weatherLoading={weatherLoading}
@@ -355,15 +362,14 @@ const AppInner: React.FC = () => {
             dayTides={dayTides}
             marineHorizonDate={marineHorizonDate}
           />
-          <DivabilityWidget selectedDate={selectedDate} weather={weather} marineHorizonDate={marineHorizonDate} />
         </div>
 
-        {/* Tides full width */}
+        {/* Row 3: Tides full width */}
         <div className="mb-4">
           <TidesWidget selectedDay={selectedDay} tideData={tideData} tidesLoading={tidesLoading} tidesError={tidesError} onRetry={fetchTides} />
         </div>
 
-        {/* Bottom row: Club + Equipment + DiveSites */}
+        {/* Row 4: Club + Equipment + DiveSites */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <ClubDivesWidget />
           <EquipmentWidget />
