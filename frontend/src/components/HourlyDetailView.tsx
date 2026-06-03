@@ -66,6 +66,17 @@ function windDirLabel(deg: number): string {
   return dirs[Math.round(deg / 22.5) % 16];
 }
 
+function windDirectionFull(deg: number): string {
+  const dirs = [
+    'Nord', 'Nord-Nord-Est', 'Nord-Est', 'Est-Nord-Est',
+    'Est', 'Est-Sud-Est', 'Sud-Est', 'Sud-Sud-Est',
+    'Sud', 'Sud-Sud-Ouest', 'Sud-Ouest', 'Ouest-Sud-Ouest',
+    'Ouest', 'Ouest-Nord-Ouest', 'Nord-Ouest', 'Nord-Nord-Ouest',
+  ];
+  const label = dirs[Math.round(deg / 22.5) % 16];
+  return `${label} (${Math.round(deg)}°)`;
+}
+
 function fmt1(v: number | null | undefined): string {
   if (v == null || isNaN(v)) return '—';
   return v.toFixed(1);
@@ -272,7 +283,16 @@ const TableMode: React.FC<{
             <RowLabel label="Direction" />
             {validHours.map(h => {
               const v = get(weather.hourly.winddirection_10m, h);
-              return <Cell key={h} value={v != null ? windDirLabel(v) : '—'} center />;
+              return (
+                <td
+                  key={h}
+                  title={v != null ? windDirectionFull(v) : undefined}
+                  className="px-2 py-1.5 whitespace-nowrap border-b border-navy-800/50 font-mono text-sm text-center"
+                  style={{ color: '#9ca3af', minWidth: '52px' }}
+                >
+                  {v != null ? windDirLabel(v) : '—'}
+                </td>
+              );
             })}
           </tr>
           <tr>
@@ -442,21 +462,33 @@ const TableMode: React.FC<{
       </table>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-4 px-4 py-3 border-t border-navy-700 bg-navy-950 text-xs text-gray-500">
-        <span className="font-semibold text-gray-400">Légende :</span>
+      <div className="flex flex-wrap gap-x-6 gap-y-2 px-4 py-3 border-t border-navy-700 bg-navy-950 text-xs text-gray-500">
+        <span className="font-semibold text-gray-400 w-full">Légende des couleurs :</span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded" style={{ backgroundColor: '#2dd4bf44' }} />Favorable
+          <span className="w-4 h-3 rounded" style={{ backgroundColor: '#2dd4bf33' }} />
+          <span className="text-gray-400">Favorable</span>
+          <span className="text-gray-600 ml-1">(vent &lt;8 kt, vagues &lt;0,3 m)</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded" style={{ backgroundColor: '#f59e0b44' }} />Modéré
+          <span className="w-4 h-3 rounded" style={{ backgroundColor: '#f59e0b33' }} />
+          <span className="text-gray-400">Modéré</span>
+          <span className="text-gray-600 ml-1">(vent 8–15 kt, vagues 0,3–0,8 m)</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded" style={{ backgroundColor: '#f9731644' }} />Difficile
+          <span className="w-4 h-3 rounded" style={{ backgroundColor: '#f9731633' }} />
+          <span className="text-gray-400">Difficile</span>
+          <span className="text-gray-600 ml-1">(vent 15–20 kt, vagues 0,8–1,2 m)</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded" style={{ backgroundColor: '#ef444444' }} />Défavorable
+          <span className="w-4 h-3 rounded" style={{ backgroundColor: '#ef444433' }} />
+          <span className="text-gray-400">Défavorable</span>
+          <span className="text-gray-600 ml-1">(vent &gt;20 kt, vagues &gt;1,2 m)</span>
         </span>
-        <span className="ml-auto text-gray-700">Long. d'onde = 1.56 × T² (approx. eau profonde)</span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-4 h-3 rounded" style={{ backgroundColor: '#3b82f633' }} />
+          <span className="text-gray-400">Précipitations</span>
+        </span>
+        <span className="mt-1 w-full text-gray-700">Long. d'onde = 1,56 × T² (approximation eau profonde) · Données marines disponibles ~7 premiers jours uniquement</span>
       </div>
     </div>
   );

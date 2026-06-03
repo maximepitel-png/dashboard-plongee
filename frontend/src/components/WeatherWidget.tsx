@@ -1,6 +1,7 @@
 import React from 'react';
 import { Wind, Waves, AlertTriangle } from 'lucide-react';
 import { useUnits } from '../contexts/UnitContext';
+import InfoTooltip from './InfoTooltip';
 
 interface WeatherData {
   current: {
@@ -58,9 +59,9 @@ const SITE_BEARING = 0;
 
 function waveExposure(dirFrom: number): { label: string; color: string } {
   const diff = Math.abs(((dirFrom - SITE_BEARING + 180) % 360) - 180);
-  if (diff < 60) return { label: 'Face (onshore)', color: '#ef4444' };
-  if (diff < 120) return { label: 'Latéral', color: '#f59e0b' };
-  return { label: 'Dos (offshore)', color: '#22c55e' };
+  if (diff < 60) return { label: 'Face au site — houle défavorable', color: '#ef4444' };
+  if (diff < 120) return { label: 'Latérale — modérément exposé', color: '#f59e0b' };
+  return { label: 'Dos au site — peu exposé', color: '#22c55e' };
 }
 
 // Wetsuit recommendation based on sea surface temperature
@@ -104,6 +105,17 @@ function weatherEmoji(code: number): string {
 function windDirectionLabel(deg: number): string {
   const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
   return dirs[Math.round(deg / 45) % 8];
+}
+
+function windDirectionFull(deg: number): string {
+  const dirs = [
+    'Nord', 'Nord-Nord-Est', 'Nord-Est', 'Est-Nord-Est',
+    'Est', 'Est-Sud-Est', 'Sud-Est', 'Sud-Sud-Est',
+    'Sud', 'Sud-Sud-Ouest', 'Sud-Ouest', 'Ouest-Sud-Ouest',
+    'Ouest', 'Ouest-Nord-Ouest', 'Nord-Ouest', 'Nord-Nord-Ouest',
+  ];
+  const label = dirs[Math.round(deg / 22.5) % 16];
+  return `${label} (${Math.round(deg)}°)`;
 }
 
 const WeatherWidget: React.FC<Props> = ({
@@ -253,7 +265,7 @@ const WeatherWidget: React.FC<Props> = ({
                 <span className="text-xs text-gray-500 ml-1">rafales {formatWind(conditions.windgusts)}</span>
               </div>
               <p className="text-xs text-gray-400">
-                {windDirectionLabel(conditions.winddirection)} ({Math.round(conditions.winddirection)}°)
+                {windDirectionFull(conditions.winddirection)}
               </p>
             </div>
           </div>
@@ -263,7 +275,7 @@ const WeatherWidget: React.FC<Props> = ({
             <div className="grid grid-cols-2 gap-3 mb-3">
               {/* Swell */}
               <div className="bg-navy-900 rounded-lg p-3">
-                <p className="text-xs text-gray-500 mb-1">Houle</p>
+                <p className="text-xs text-gray-500 mb-1 flex items-center">Houle<InfoTooltip text="La houle est une vague de longue période formée loin du site par le vent. Elle est distincte de la mer de vent locale. Une forte houle peut rendre la mise à l'eau difficile même par vent calme." /></p>
                 <p className="text-lg font-bold text-white">{marine.swellHeight.toFixed(1)} m</p>
                 <p className="text-xs text-gray-400">{marine.swellPeriod.toFixed(0)}s · {windDirectionLabel(marine.swellDirection)}</p>
                 <p className="text-xs mt-0.5" style={{ color: waveExposure(marine.swellDirection).color }}>
@@ -272,7 +284,7 @@ const WeatherWidget: React.FC<Props> = ({
               </div>
               {/* Wind sea */}
               <div className="bg-navy-900 rounded-lg p-3">
-                <p className="text-xs text-gray-500 mb-1">Mer de vent</p>
+                <p className="text-xs text-gray-500 mb-1 flex items-center">Mer de vent<InfoTooltip text="La mer de vent (ou 'wind sea') est formée localement par le vent actuel. Elle est plus courte et chaotique que la houle. En Manche, elle peut s'élever rapidement en cas de coup de vent." /></p>
                 <p className="text-lg font-bold text-white">{marine.windWaveHeight.toFixed(1)} m</p>
                 <p className="text-xs text-gray-400">{windDirectionLabel(marine.windWaveDirection)}</p>
                 <p className="text-xs mt-0.5" style={{ color: waveExposure(marine.windWaveDirection).color }}>
@@ -281,7 +293,7 @@ const WeatherWidget: React.FC<Props> = ({
               </div>
               {/* Current */}
               <div className="bg-navy-900 rounded-lg p-3">
-                <p className="text-xs text-gray-500 mb-1">Courant</p>
+                <p className="text-xs text-gray-500 mb-1 flex items-center">Courant<InfoTooltip text="Vitesse du courant de surface estimée par le modèle. En Manche, le courant de flot/jusant peut atteindre 2–3 nœuds. À l'étale, il est quasi nul." /></p>
                 <p className="text-lg font-bold text-white">{(marine.currentVelocity * 1.944).toFixed(1)} kt</p>
                 <p className="text-xs text-gray-400">Dir: {windDirectionLabel(marine.currentDirection)} ({Math.round(marine.currentDirection)}°)</p>
               </div>

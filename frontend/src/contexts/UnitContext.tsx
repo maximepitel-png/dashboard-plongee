@@ -22,7 +22,7 @@ const UnitContext = createContext<UnitContextValue>({
 });
 
 export const UnitProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [windUnit, setWindUnit] = useState<WindUnit>('kt');
+  const [windUnit, setWindUnit] = useState<WindUnit>('kmh');
   const [tempUnit, setTempUnit] = useState<TempUnit>('c');
 
   const formatWind = (kt: number): string => {

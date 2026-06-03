@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Target } from 'lucide-react';
 import { useUnits } from '../contexts/UnitContext';
 import { useSiteAdjustment, getSiteMultipliers } from '../contexts/SiteAdjustmentContext';
+import InfoTooltip from './InfoTooltip';
 
 /**
  * CONFIGURATION DU SCORING — modifier ici pour ajuster les seuils
@@ -249,6 +250,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
       <div className="card-header">
         <Target size={18} className="text-ocean-400" />
         <span>Indice de Plongeabilité</span>
+        <InfoTooltip text="Score de 0 à 100 combinant vent, vagues, clarté, température de l'eau et courant. 80+ = excellentes conditions, en dessous de 40 = déconseillé." />
       </div>
 
       {loading && (
@@ -355,10 +357,18 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
               const pct = (d.score / d.maxPts) * 100;
               const barColor = d.score >= d.maxPts * 0.7 ? '#2dd4bf' : d.score >= d.maxPts * 0.4 ? '#f59e0b' : '#ef4444';
               const qualLabel = d.score >= d.maxPts * 0.7 ? 'Favorable' : d.score >= d.maxPts * 0.4 ? 'Moyen' : 'Défavorable';
+              const labelTooltip: Record<string, string> = {
+                'Clarté estimée': "Proxy basé sur les précipitations en surface. Ne reflète pas directement la visibilité sous l'eau, qui dépend aussi de la turbidité et des sédiments.",
+                'Courant': "Vitesse du courant océanique de surface. À l'étale (renverse), le courant est quasi nul pendant ~30 à 90 minutes.",
+                'Temp. mer': "Température de surface de la mer (SST). La température réelle en profondeur peut être de 2 à 5°C plus froide.",
+              };
               return (
                 <div key={d.label}>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400 w-24 shrink-0">{d.label}</span>
+                    <span className="text-xs text-gray-400 w-24 shrink-0 flex items-center">
+                      {d.label}
+                      {labelTooltip[d.label] && <InfoTooltip text={labelTooltip[d.label]} />}
+                    </span>
                     <div className="flex-1 bg-navy-900 rounded-full h-2.5 relative" title={`${d.score}/${d.maxPts} pts — ${qualLabel}`}>
                       <div
                         className="h-2.5 rounded-full transition-all duration-500"

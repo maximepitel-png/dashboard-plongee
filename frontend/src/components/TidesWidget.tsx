@@ -10,6 +10,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { Waves, TrendingUp, TrendingDown } from 'lucide-react';
+import InfoTooltip from './InfoTooltip';
 
 interface TidePoint {
   time: string;
@@ -208,7 +209,7 @@ const TidesWidget: React.FC<Props> = ({ selectedDay, tideData, tidesLoading, tid
 
           <div className="mt-3 bg-navy-900 rounded-lg p-2.5">
             <div className="flex justify-between text-xs text-gray-400 mb-1">
-              <span>Coeff. marée estimé: <strong style={{ color: getCoefficientColor(currentDay.coefficient) }}>~{currentDay.coefficient}</strong></span>
+              <span className="flex items-center gap-1">Coeff. marée estimé<InfoTooltip text="Le coefficient de marée (20 à 120) mesure l'amplitude de la marée. En dessous de 70 : morte-eau (faibles courants). Au-dessus de 95 : vive-eau (forts courants, grande amplitude)." /> : <strong style={{ color: getCoefficientColor(currentDay.coefficient) }}>~{currentDay.coefficient}</strong></span>
               <span>{currentDay.coefficient <= 70 ? 'Morte-eau' : currentDay.coefficient >= 95 ? 'Vive-eau' : 'Modérée'}</span>
             </div>
             <div className="h-2 bg-navy-700 rounded-full overflow-hidden">
@@ -223,6 +224,10 @@ const TidesWidget: React.FC<Props> = ({ selectedDay, tideData, tidesLoading, tid
             <div className="flex justify-between text-xs text-gray-600 mt-0.5">
               <span>20</span><span>70</span><span>95</span><span>120</span>
             </div>
+            <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
+              Marnage estimé
+              <InfoTooltip text="Le marnage est la différence de hauteur entre la pleine mer et la basse mer. À Ouistreham il varie de ~3 m (morte-eau) à ~7,6 m (vive-eau de fort coefficient)." />
+            </p>
           </div>
 
           <p className="text-xs text-gray-600 mt-3 text-center">
