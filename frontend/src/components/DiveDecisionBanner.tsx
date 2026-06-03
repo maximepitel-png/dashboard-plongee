@@ -45,6 +45,7 @@ interface WeatherData {
     hourly: {
       time: string[];
       wave_height: number[];
+      ocean_current_velocity: number[];
     };
   };
   daily: {
@@ -109,9 +110,12 @@ function computeEtaleWindows(
 
     const wind = getHourlyValue(weather.hourly.time, weather.hourly.windspeed_10m, t);
     const waves = getHourlyValue(weather.marine.hourly.time, weather.marine.hourly.wave_height, t);
+    const currentMs = getHourlyValue(weather.marine.hourly.time, weather.marine.hourly.ocean_current_velocity ?? [], t);
     const isDaylight = windowStart >= sunrise && windowEnd <= sunset;
 
-    const score = computeWindScore(wind) + computeWaveScore(waves) + (isDaylight ? 10 : 0);
+    // Score : vent + vagues + bonus diurne + bonus courant faible à l'étale
+    const currentBonus = currentMs < 0.3 ? 10 : currentMs < 0.6 ? 5 : 0;
+    const score = computeWindScore(wind) + computeWaveScore(waves) + (isDaylight ? 10 : 0) + currentBonus;
 
     return {
       extremeType: ext.type,

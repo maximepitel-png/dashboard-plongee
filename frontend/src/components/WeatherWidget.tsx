@@ -5,6 +5,7 @@ interface WeatherData {
   current: {
     temperature: number;
     windspeed: number;
+    windgusts: number;
     winddirection: number;
     weathercode: number;
     precipitation: number;
@@ -14,6 +15,7 @@ interface WeatherData {
     time: string[];
     temperature_2m: number[];
     windspeed_10m: number[];
+    windgusts_10m: number[];
     winddirection_10m: number[];
     precipitation: number[];
     weathercode: number[];
@@ -24,11 +26,40 @@ interface WeatherData {
       wave_height: number[];
       wave_direction: number[];
       wave_period: number[];
+      swell_wave_height: number[];
+      swell_wave_direction: number[];
+      swell_wave_period: number[];
+      wind_wave_height: number[];
+      wind_wave_direction: number[];
+      ocean_current_velocity: number[];
+      ocean_current_direction: number[];
       sea_surface_temperature: number[];
     };
   };
+  daily: { sunrise: string[]; sunset: string[] };
   location: { lat: number; lon: number; name: string };
   isMock?: boolean;
+}
+
+// Ouistreham coast faces roughly North (bearing ~0°).
+// Waves coming from N = onshore; from S = offshore.
+const SITE_BEARING = 0;
+
+function waveExposure(dirFrom: number): { label: string; color: string } {
+  const diff = Math.abs(((dirFrom - SITE_BEARING + 180) % 360) - 180);
+  if (diff < 60) return { label: 'Face (onshore)', color: '#ef4444' };
+  if (diff < 120) return { label: 'Latéral', color: '#f59e0b' };
+  return { label: 'Dos (offshore)', color: '#22c55e' };
+}
+
+// Wetsuit recommendation based on sea surface temperature
+function wetsuitAdvice(sst: number): string {
+  if (sst < 8)  return 'Combinaison étanche';
+  if (sst < 12) return '7 mm + cagoule + gants';
+  if (sst < 16) return '5 mm + cagoule';
+  if (sst < 20) return '5 mm';
+  if (sst < 24) return '3 mm';
+  return '3 mm ou shorty';
 }
 
 function weatherDescription(code: number): string {
@@ -119,11 +150,19 @@ const WeatherWidget: React.FC = () => {
     const now = new Date().toISOString().slice(0, 13);
     const idx = weather.marine.hourly.time.findIndex((t) => t.startsWith(now));
     const i = idx >= 0 ? idx : 0;
+    const h = weather.marine.hourly;
     return {
-      waveHeight: weather.marine.hourly.wave_height[i] ?? 0,
-      waveDirection: weather.marine.hourly.wave_direction[i] ?? 0,
-      wavePeriod: weather.marine.hourly.wave_period[i] ?? 0,
-      seaTemp: weather.marine.hourly.sea_surface_temperature[i] ?? 0,
+      waveHeight: h.wave_height[i] ?? 0,
+      waveDirection: h.wave_direction[i] ?? 0,
+      wavePeriod: h.wave_period[i] ?? 0,
+      swellHeight: h.swell_wave_height[i] ?? 0,
+      swellDirection: h.swell_wave_direction[i] ?? 0,
+      swellPeriod: h.swell_wave_period[i] ?? 0,
+      windWaveHeight: h.wind_wave_height[i] ?? 0,
+      windWaveDirection: h.wind_wave_direction[i] ?? 0,
+      currentVelocity: h.ocean_current_velocity[i] ?? 0,
+      currentDirection: h.ocean_current_direction[i] ?? 0,
+      seaTemp: h.sea_surface_temperature[i] ?? 0,
     };
   };
 
@@ -197,54 +236,63 @@ const WeatherWidget: React.FC = () => {
 
       {weather && !loading && (
         <>
-          {/* Current conditions */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          {/* Current conditions — row 1: air */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
             <div className="bg-navy-900 rounded-lg p-3 flex items-center gap-3">
               <span className="text-4xl">{weatherEmoji(weather.current.weathercode)}</span>
               <div>
                 <p className="text-2xl font-bold text-white">{Math.round(weather.current.temperature)}°C</p>
                 <p className="text-xs text-gray-400">{weatherDescription(weather.current.weathercode)}</p>
+                <p className="text-xs text-gray-500">Précip: {weather.current.precipitation.toFixed(1)} mm/h</p>
               </div>
             </div>
             <div className="bg-navy-900 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-1 mb-1">
                 <span className="text-ocean-400">💨</span>
                 <span className="text-lg font-bold">{Math.round(weather.current.windspeed)} kt</span>
+                <span className="text-xs text-gray-500 ml-1">rafales {Math.round(weather.current.windgusts)} kt</span>
               </div>
               <p className="text-xs text-gray-400">
-                Direction: {windDirectionLabel(weather.current.winddirection)} ({Math.round(weather.current.winddirection)}°)
-              </p>
-              <p className="text-xs text-gray-400">
-                Précip: {weather.current.precipitation.toFixed(1)} mm
+                {windDirectionLabel(weather.current.winddirection)} ({Math.round(weather.current.winddirection)}°)
               </p>
             </div>
-            {marine && (
-              <>
-                <div className="bg-navy-900 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-ocean-400">🌊</span>
-                    <span className="text-lg font-bold">{marine.waveHeight.toFixed(1)} m</span>
-                  </div>
-                  <p className="text-xs text-gray-400">
-                    Hauteur des vagues
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Période: {marine.wavePeriod.toFixed(0)}s
-                  </p>
-                </div>
-                <div className="bg-navy-900 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-ocean-400">🌡️</span>
-                    <span className="text-lg font-bold">{marine.seaTemp.toFixed(1)}°C</span>
-                  </div>
-                  <p className="text-xs text-gray-400">Température mer</p>
-                  <p className="text-xs text-gray-400">
-                    Dir. vagues: {windDirectionLabel(marine.waveDirection)}
-                  </p>
-                </div>
-              </>
-            )}
           </div>
+
+          {/* Row 2: sea */}
+          {marine && (
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              {/* Swell */}
+              <div className="bg-navy-900 rounded-lg p-3">
+                <p className="text-xs text-gray-500 mb-1">Houle</p>
+                <p className="text-lg font-bold text-white">{marine.swellHeight.toFixed(1)} m</p>
+                <p className="text-xs text-gray-400">{marine.swellPeriod.toFixed(0)}s · {windDirectionLabel(marine.swellDirection)}</p>
+                <p className="text-xs mt-0.5" style={{ color: waveExposure(marine.swellDirection).color }}>
+                  {waveExposure(marine.swellDirection).label}
+                </p>
+              </div>
+              {/* Wind sea */}
+              <div className="bg-navy-900 rounded-lg p-3">
+                <p className="text-xs text-gray-500 mb-1">Mer de vent</p>
+                <p className="text-lg font-bold text-white">{marine.windWaveHeight.toFixed(1)} m</p>
+                <p className="text-xs text-gray-400">{windDirectionLabel(marine.windWaveDirection)}</p>
+                <p className="text-xs mt-0.5" style={{ color: waveExposure(marine.windWaveDirection).color }}>
+                  {waveExposure(marine.windWaveDirection).label}
+                </p>
+              </div>
+              {/* Current */}
+              <div className="bg-navy-900 rounded-lg p-3">
+                <p className="text-xs text-gray-500 mb-1">Courant</p>
+                <p className="text-lg font-bold text-white">{(marine.currentVelocity * 1.944).toFixed(1)} kt</p>
+                <p className="text-xs text-gray-400">Dir: {windDirectionLabel(marine.currentDirection)} ({Math.round(marine.currentDirection)}°)</p>
+              </div>
+              {/* Sea temp + wetsuit */}
+              <div className="bg-navy-900 rounded-lg p-3">
+                <p className="text-xs text-gray-500 mb-1">Mer (surface)</p>
+                <p className="text-lg font-bold text-white">{marine.seaTemp.toFixed(1)}°C</p>
+                <p className="text-xs text-ocean-400">{wetsuitAdvice(marine.seaTemp)}</p>
+              </div>
+            </div>
+          )}
 
           {/* 24h forecast */}
           <div>

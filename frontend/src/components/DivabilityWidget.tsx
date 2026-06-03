@@ -1,10 +1,76 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
+/**
+ * CONFIGURATION DU SCORING — modifier ici pour ajuster les seuils
+ * Total max : 100 pts (vent 25 + vagues 30 + clarté 20 + temp 10 + courant 15)
+ */
+const DIVABILITY_CONFIG = {
+  wind: {
+    maxPts: 25,
+    // [seuil_kt, pts] — au-delà du dernier seuil : 0 pt
+    thresholds: [
+      { below: 8,  pts: 25 },
+      { below: 12, pts: 20 },
+      { below: 15, pts: 10 },
+      { below: 20, pts: 5  },
+    ],
+  },
+  waves: {
+    maxPts: 30,
+    thresholds: [
+      { below: 0.3, pts: 30 },
+      { below: 0.5, pts: 25 },
+      { below: 0.8, pts: 18 },
+      { below: 1.2, pts: 10 },
+      { below: 1.5, pts: 4  },
+    ],
+  },
+  clarity: {
+    maxPts: 20,
+    // Proxy précipitation surface (mm/h)
+    thresholds: [
+      { below: 0.01, pts: 20 },
+      { below: 0.5,  pts: 15 },
+      { below: 2,    pts: 8  },
+      { below: 5,    pts: 3  },
+    ],
+  },
+  temperature: {
+    maxPts: 10,
+    // SST en °C
+    thresholds: [
+      { below: 999, pts: 10, above: 16 },
+      { below: 16,  pts: 8,  above: 12 },
+      { below: 12,  pts: 6,  above: 10 },
+      { below: 10,  pts: 4,  above: 8  },
+    ],
+    fallback: 2, // < 8°C combinaison étanche
+  },
+  current: {
+    maxPts: 15,
+    // Courant en m/s (ocean_current_velocity)
+    thresholds: [
+      { below: 0.3, pts: 15 },
+      { below: 0.6, pts: 12 },
+      { below: 1.0, pts: 7  },
+      { below: 1.5, pts: 3  },
+    ],
+  },
+};
+
+function scoreFromThresholds(value: number, thresholds: { below: number; pts: number }[]): number {
+  for (const t of thresholds) {
+    if (value < t.below) return t.pts;
+  }
+  return 0;
+}
+
 interface WeatherData {
   current: {
     temperature: number;
     windspeed: number;
+    windgusts: number;
     winddirection: number;
     weathercode: number;
     precipitation: number;
@@ -14,6 +80,7 @@ interface WeatherData {
     time: string[];
     temperature_2m: number[];
     windspeed_10m: number[];
+    windgusts_10m: number[];
     winddirection_10m: number[];
     precipitation: number[];
     weathercode: number[];
@@ -24,6 +91,11 @@ interface WeatherData {
       wave_height: number[];
       wave_direction: number[];
       wave_period: number[];
+      swell_wave_height: number[];
+      swell_wave_direction: number[];
+      wind_wave_height: number[];
+      ocean_current_velocity: number[];
+      ocean_current_direction: number[];
       sea_surface_temperature: number[];
     };
   };
@@ -38,14 +110,9 @@ interface TidalImpact {
 
 interface DivabilityScore {
   total: number;
-  wind: number;
-  waves: number;
-  visibility: number;
-  temperature: number;
-  tidal: number;
   verdict: string;
   verdictColor: string;
-  details: { label: string; value: string; score: number; note?: string }[];
+  details: { label: string; value: string; score: number; maxPts: number; note?: string }[];
 }
 
 function computeDivability(
@@ -53,52 +120,27 @@ function computeDivability(
   waveHeight: number,
   precipitation: number,
   seaTemp: number,
-  tidalCoeff: number
+  currentMs: number,  // ocean current in m/s
 ): DivabilityScore {
-  // Wind score (0-25 pts): < 8kt = 25, >15kt = 0
-  let windScore = 0;
-  if (windKnots < 8) windScore = 25;
-  else if (windKnots < 12) windScore = 20;
-  else if (windKnots < 15) windScore = 10;
-  else if (windKnots < 20) windScore = 5;
-  else windScore = 0;
+  const cfg = DIVABILITY_CONFIG;
 
-  // Wave score (0-30 pts): < 0.5m = 30, >1.5m = 0
-  let waveScore = 0;
-  if (waveHeight < 0.3) waveScore = 30;
-  else if (waveHeight < 0.5) waveScore = 25;
-  else if (waveHeight < 0.8) waveScore = 18;
-  else if (waveHeight < 1.2) waveScore = 10;
-  else if (waveHeight < 1.5) waveScore = 4;
-  else waveScore = 0;
+  const windScore = scoreFromThresholds(windKnots, cfg.wind.thresholds);
+  const waveScore = scoreFromThresholds(waveHeight, cfg.waves.thresholds);
 
-  // Clarté estimée (0-20 pts) : proxy basé sur la précipitation cumulée surface.
-  // Pas de donnée de visibilité sous-marine disponible gratuitement.
-  // On pénalise la pluie forte (remontée de sédiments, ruissellement estuaire Orne).
-  let visScore = 0;
-  if (precipitation === 0) visScore = 20;
-  else if (precipitation < 0.5) visScore = 15;
-  else if (precipitation < 2) visScore = 8;
-  else if (precipitation < 5) visScore = 3;
-  else visScore = 0;
+  // Clarté estimée : proxy précip surface. Pénalise la pluie (ruissellement, sédiments Orne).
+  const clarityScore = scoreFromThresholds(precipitation, cfg.clarity.thresholds);
 
-  // Temperature score (0-10 pts): < 8°C = penalty
-  let tempScore = 0;
+  // Température : SST surface (≠ profondeur sous thermocline)
+  let tempScore = cfg.temperature.fallback;
   if (seaTemp >= 16) tempScore = 10;
   else if (seaTemp >= 12) tempScore = 8;
   else if (seaTemp >= 10) tempScore = 6;
   else if (seaTemp >= 8) tempScore = 4;
-  else tempScore = 2; // cold but doable with drysuit
 
-  // Tidal coefficient score (0-15 pts): low coeff = better diving
-  let tidalScore = 0;
-  if (tidalCoeff <= 50) tidalScore = 15;
-  else if (tidalCoeff <= 70) tidalScore = 12;
-  else if (tidalCoeff <= 90) tidalScore = 7;
-  else if (tidalCoeff <= 100) tidalScore = 3;
-  else tidalScore = 0;
+  // Courant en m/s → remplace le coefficient de marée dans l'indice
+  const currentScore = scoreFromThresholds(currentMs, cfg.current.thresholds);
 
-  const total = windScore + waveScore + visScore + tempScore + tidalScore;
+  const total = windScore + waveScore + clarityScore + tempScore + currentScore;
 
   let verdict = '';
   let verdictColor = '';
@@ -110,19 +152,14 @@ function computeDivability(
 
   return {
     total,
-    wind: windScore,
-    waves: waveScore,
-    visibility: visScore,
-    temperature: tempScore,
-    tidal: tidalScore,
     verdict,
     verdictColor,
     details: [
-      { label: 'Vent', value: `${Math.round(windKnots)} kt`, score: windScore },
-      { label: 'Vagues', value: `${waveHeight.toFixed(1)} m`, score: waveScore },
-      { label: 'Clarté estimée', value: precipitation === 0 ? 'Favorable' : `${precipitation.toFixed(1)} mm/h`, score: visScore, note: 'proxy précip. surface — ≠ visibilité sous-marine' },
-      { label: 'Temp. mer', value: `${seaTemp.toFixed(1)}°C`, score: tempScore },
-      { label: 'Coeff. marée', value: `${tidalCoeff}`, score: tidalScore },
+      { label: 'Vent', value: `${Math.round(windKnots)} kt`, score: windScore, maxPts: cfg.wind.maxPts },
+      { label: 'Vagues', value: `${waveHeight.toFixed(1)} m`, score: waveScore, maxPts: cfg.waves.maxPts },
+      { label: 'Clarté estimée', value: precipitation < 0.01 ? 'Favorable' : `${precipitation.toFixed(1)} mm/h`, score: clarityScore, maxPts: cfg.clarity.maxPts, note: 'proxy précip. surface — ≠ visibilité sous-marine' },
+      { label: 'Temp. mer', value: `${seaTemp.toFixed(1)}°C`, score: tempScore, maxPts: cfg.temperature.maxPts },
+      { label: 'Courant', value: `${(currentMs * 1.944).toFixed(1)} kt`, score: currentScore, maxPts: cfg.current.maxPts },
     ],
   };
 }
@@ -161,6 +198,7 @@ const DivabilityWidget: React.FC = () => {
     let waveHeight: number;
     let precipitation: number;
     let seaTemp: number;
+    let currentMs: number;
 
     if (selectedDate) {
       const targetTime = new Date(selectedDate + 'T12:00:00').toISOString().slice(0, 13);
@@ -172,6 +210,7 @@ const DivabilityWidget: React.FC = () => {
       const mi = marineIdx >= 0 ? marineIdx : 0;
       waveHeight = weather.marine.hourly.wave_height[mi] || 0;
       seaTemp = weather.marine.hourly.sea_surface_temperature[mi] || 12;
+      currentMs = weather.marine.hourly.ocean_current_velocity[mi] || 0;
     } else {
       windKnots = weather.current.windspeed;
       precipitation = weather.current.precipitation;
@@ -180,9 +219,10 @@ const DivabilityWidget: React.FC = () => {
       const i = mi >= 0 ? mi : 0;
       waveHeight = weather.marine.hourly.wave_height[i] || 0;
       seaTemp = weather.marine.hourly.sea_surface_temperature[i] || 12;
+      currentMs = weather.marine.hourly.ocean_current_velocity[i] || 0;
     }
 
-    const computed = computeDivability(windKnots, waveHeight, precipitation, seaTemp, tidalImpact.coefficient);
+    const computed = computeDivability(windKnots, waveHeight, precipitation, seaTemp, currentMs);
     setScore(computed);
   }, [weather, tidalImpact, selectedDate]);
 
@@ -291,8 +331,8 @@ const DivabilityWidget: React.FC = () => {
                     <div
                       className="h-2 rounded-full transition-all duration-500"
                       style={{
-                        width: `${(d.score / 30) * 100}%`,
-                        backgroundColor: d.score >= 20 ? '#22c55e' : d.score >= 10 ? '#f59e0b' : '#ef4444',
+                        width: `${(d.score / d.maxPts) * 100}%`,
+                        backgroundColor: d.score >= d.maxPts * 0.7 ? '#22c55e' : d.score >= d.maxPts * 0.4 ? '#f59e0b' : '#ef4444',
                       }}
                     />
                   </div>
@@ -314,7 +354,7 @@ const DivabilityWidget: React.FC = () => {
               </div>
               <div className="flex items-center gap-1.5 text-gray-400">
                 <span>⚓</span>
-                <span>Coeff. ~{tidalImpact.coefficient} (estimé)</span>
+                <span>Coeff. marée ~{tidalImpact.coefficient}</span>
               </div>
             </div>
           )}
