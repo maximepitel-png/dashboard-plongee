@@ -64,7 +64,6 @@ function apiGet<T>(path: string): Promise<T> {
   const key = process.env.MAREE_API_KEY;
   if (!key) return Promise.reject(new Error('MAREE_API_KEY not set'));
 
-  // path already contains query string; append key
   const sep = path.includes('?') ? '&' : '?';
   const url = `${BASE_URL}${path}${sep}key=${encodeURIComponent(key)}`;
 
@@ -75,12 +74,29 @@ function apiGet<T>(path: string): Promise<T> {
       res.on('end', () => {
         try {
           if (res.statusCode && res.statusCode >= 400) {
-            reject(new Error(`api-maree.fr HTTP ${res.statusCode}: ${data.slice(0, 200)}`));
-          } else {
-            resolve(JSON.parse(data) as T);
+            reject(new Error(`api-maree.fr HTTP ${res.statusCode}: ${data.slice(0, 300)}`));
+            return;
           }
+          const parsed = JSON.parse(data);
+          // Log first response shape to help diagnose wrapping
+          console.log(`[tides] Response shape for ${path.split('?')[0]}:`, JSON.stringify(parsed).slice(0, 200));
+          // Unwrap common envelope patterns: { data: [...] }, { results: [...] }, { sites: [...] }, { waterLevels: [...] }
+          let unwrapped: unknown = parsed;
+          if (!Array.isArray(parsed) && typeof parsed === 'object' && parsed !== null) {
+            const keys = Object.keys(parsed as object);
+            if (keys.length === 1) {
+              unwrapped = (parsed as Record<string, unknown>)[keys[0]];
+            } else {
+              // Try common field names
+              const envelope = parsed as Record<string, unknown>;
+              unwrapped = envelope['data'] ?? envelope['results'] ?? envelope['sites'] ??
+                          envelope['waterLevels'] ?? envelope['water_levels'] ??
+                          envelope['heights'] ?? envelope['hauteurs'] ?? parsed;
+            }
+          }
+          resolve(unwrapped as T);
         } catch (e) {
-          reject(new Error(`JSON parse error: ${(e as Error).message} — body: ${data.slice(0, 200)}`));
+          reject(new Error(`JSON parse error: ${(e as Error).message} — body: ${data.slice(0, 300)}`));
         }
       });
     });
@@ -88,6 +104,7 @@ function apiGet<T>(path: string): Promise<T> {
     req.setTimeout(15000, () => { req.destroy(); reject(new Error('api-maree.fr timeout')); });
   });
 }
+
 
 // ── Site resolution ───────────────────────────────────────────────────────────
 
