@@ -71,6 +71,8 @@ function getDayWindRange(date: string, weather: any): { min: number; max: number
   return { min: Math.round(Math.min(...winds)), max: Math.round(Math.max(...winds)) };
 }
 
+const DEFAULT_LOCATION = { lat: 49.2796, lon: -0.2602, name: 'Ouistreham' };
+
 const AppInner: React.FC = () => {
   const { selectedSite } = useDiveSites();
   const [currentTime, setCurrentTime] = React.useState(new Date());
@@ -78,7 +80,10 @@ const AppInner: React.FC = () => {
   const [tidesLoading, setTidesLoading] = React.useState(true);
   const [tidesError, setTidesError] = React.useState<string | null>(null);
   const [selectedDay, setSelectedDay] = React.useState(0);
-  const [scoringWeather, setScoringWeather] = React.useState<any>(null);
+  const [location, setLocation] = React.useState(DEFAULT_LOCATION);
+  const [weather, setWeather] = React.useState<any>(null);
+  const [weatherLoading, setWeatherLoading] = React.useState(true);
+  const [weatherError, setWeatherError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -102,15 +107,30 @@ const AppInner: React.FC = () => {
     fetchTides();
   }, [fetchTides]);
 
+  const fetchWeather = React.useCallback(async () => {
+    setWeatherLoading(true);
+    setWeatherError(null);
+    try {
+      const res = await axios.get(
+        `/api/weather?lat=${location.lat}&lon=${location.lon}&name=${encodeURIComponent(location.name)}`
+      );
+      setWeather(res.data);
+    } catch {
+      setWeatherError('Impossible de récupérer les données météo');
+    } finally {
+      setWeatherLoading(false);
+    }
+  }, [location]);
+
   React.useEffect(() => {
-    axios.get('/api/weather').then((res) => setScoringWeather(res.data)).catch(() => {});
-  }, []);
+    fetchWeather();
+  }, [fetchWeather]);
 
   const formatDate = (d: Date) =>
     d.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const selectedDate = tideData[selectedDay]?.date ?? '';
-  const marineHorizonDate = scoringWeather?.marineHorizonDate ?? null;
+  const marineHorizonDate = weather?.marineHorizonDate ?? null;
 
   return (
     <SiteAdjustmentProvider selectedSite={selectedSite}>
@@ -167,12 +187,12 @@ const AppInner: React.FC = () => {
               <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
                 {tideData.map((d, i) => {
                   const beyondMarine = isDayBeyondMarine(d.date, marineHorizonDate);
-                  const windRange = scoringWeather ? getDayWindRange(d.date, scoringWeather) : null;
+                  const windRange = weather ? getDayWindRange(d.date, weather) : null;
                   const resLabel = forecastResolutionLabel(i);
 
                   let dotColor: string | null = null;
-                  if (!beyondMarine && scoringWeather) {
-                    const ds = computeDayScore(d.extremes, scoringWeather, i);
+                  if (!beyondMarine && weather) {
+                    const ds = computeDayScore(d.extremes, weather, i);
                     if (ds.quality === 'excellent') dotColor = '#2dd4bf';
                     else if (ds.quality === 'good') dotColor = '#f59e0b';
                   }
@@ -211,7 +231,7 @@ const AppInner: React.FC = () => {
                   );
                 })}
               </div>
-              {scoringWeather && (
+              {weather && (
                 <div className="flex items-center gap-4 mt-2 text-xs text-gray-600 flex-wrap">
                   <span className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-teal-400 inline-block" />
@@ -231,12 +251,20 @@ const AppInner: React.FC = () => {
         </div>
 
         {/* Decision banner — meilleur créneau du jour */}
-        <DiveDecisionBanner selectedDay={selectedDay} tideData={tideData} marineHorizonDate={marineHorizonDate} />
+        <DiveDecisionBanner selectedDay={selectedDay} tideData={tideData} weather={weather} marineHorizonDate={marineHorizonDate} />
 
         {/* Top row: Weather + Divability */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-          <WeatherWidget />
-          <DivabilityWidget selectedDate={selectedDate} marineHorizonDate={marineHorizonDate} />
+          <WeatherWidget
+            weather={weather}
+            weatherLoading={weatherLoading}
+            weatherError={weatherError}
+            onRetry={fetchWeather}
+            selectedDay={selectedDay}
+            location={location}
+            onLocationChange={setLocation}
+          />
+          <DivabilityWidget selectedDate={selectedDate} weather={weather} marineHorizonDate={marineHorizonDate} />
         </div>
 
         {/* Tides full width */}

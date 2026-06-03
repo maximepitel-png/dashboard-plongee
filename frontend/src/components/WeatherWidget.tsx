@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import { Wind, Waves, AlertTriangle, Search } from 'lucide-react';
 import { useUnits } from '../contexts/UnitContext';
@@ -41,6 +41,16 @@ interface WeatherData {
   daily: { sunrise: string[]; sunset: string[] };
   location: { lat: number; lon: number; name: string };
   isMock?: boolean;
+}
+
+interface Props {
+  weather: WeatherData | null;
+  weatherLoading: boolean;
+  weatherError: string | null;
+  onRetry: () => void;
+  selectedDay: number;
+  location: { lat: number; lon: number; name: string };
+  onLocationChange: (loc: { lat: number; lon: number; name: string }) => void;
 }
 
 // Ouistreham coast faces roughly North (bearing ~0°).
@@ -99,31 +109,18 @@ function windDirectionLabel(deg: number): string {
 
 const DEFAULT_LOCATION = { lat: 49.2796, lon: -0.2602, name: 'Ouistreham' };
 
-const WeatherWidget: React.FC = () => {
+const WeatherWidget: React.FC<Props> = ({
+  weather,
+  weatherLoading,
+  weatherError,
+  onRetry,
+  selectedDay,
+  location,
+  onLocationChange,
+}) => {
   const { formatWind, formatTemp } = useUnits();
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [location, setLocation] = useState(DEFAULT_LOCATION);
   const [searching, setSearching] = useState(false);
-
-  const fetchWeather = useCallback(async (lat: number, lon: number, name: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await axios.get(`/api/weather?lat=${lat}&lon=${lon}&name=${encodeURIComponent(name)}`);
-      setWeather(res.data);
-    } catch {
-      setError('Impossible de récupérer les données météo');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchWeather(location.lat, location.lon, location.name);
-  }, [location, fetchWeather]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +132,7 @@ const WeatherWidget: React.FC = () => {
       );
       if (res.data.results && res.data.results.length > 0) {
         const r = res.data.results[0];
-        setLocation({ lat: r.latitude, lon: r.longitude, name: r.name });
+        onLocationChange({ lat: r.latitude, lon: r.longitude, name: r.name });
         setSearchQuery('');
       } else {
         alert('Lieu non trouvé');
@@ -147,11 +144,18 @@ const WeatherWidget: React.FC = () => {
     }
   };
 
-  // Get current marine data at closest time
+  // Get marine data for the selected day
   const getCurrentMarine = () => {
     if (!weather) return null;
-    const now = new Date().toISOString().slice(0, 13);
-    const idx = weather.marine.hourly.time.findIndex((t) => t.startsWith(now));
+    let targetHour: string;
+    if (selectedDay === 0) {
+      targetHour = new Date().toISOString().slice(0, 13);
+    } else {
+      const d = new Date();
+      d.setDate(d.getDate() + selectedDay);
+      targetHour = d.toISOString().slice(0, 10) + 'T12';
+    }
+    const idx = weather.marine.hourly.time.findIndex((t) => t.startsWith(targetHour.slice(0, 13)));
     const i = idx >= 0 ? idx : 0;
     const h = weather.marine.hourly;
     return {
@@ -169,11 +173,18 @@ const WeatherWidget: React.FC = () => {
     };
   };
 
-  // Next 24h hourly forecast
+  // Next 8h hourly forecast starting from selected day
   const getNext24h = () => {
     if (!weather) return [];
-    const nowStr = new Date().toISOString().slice(0, 13);
-    const startIdx = weather.hourly.time.findIndex((t) => t >= nowStr);
+    let startStr: string;
+    if (selectedDay === 0) {
+      startStr = new Date().toISOString().slice(0, 13);
+    } else {
+      const d = new Date();
+      d.setDate(d.getDate() + selectedDay);
+      startStr = d.toISOString().slice(0, 10) + 'T12';
+    }
+    const startIdx = weather.hourly.time.findIndex((t) => t >= startStr);
     if (startIdx === -1) return [];
     return weather.hourly.time.slice(startIdx, startIdx + 8).map((t, i) => ({
       time: t,
@@ -184,7 +195,36 @@ const WeatherWidget: React.FC = () => {
     }));
   };
 
+  // Current conditions for selected day
+  const getCurrentConditions = () => {
+    if (!weather) return null;
+    if (selectedDay === 0) {
+      return {
+        temperature: weather.current.temperature,
+        windspeed: weather.current.windspeed,
+        windgusts: weather.current.windgusts,
+        winddirection: weather.current.winddirection,
+        weathercode: weather.current.weathercode,
+        precipitation: weather.current.precipitation,
+      };
+    }
+    const d = new Date();
+    d.setDate(d.getDate() + selectedDay);
+    const targetHour = d.toISOString().slice(0, 10) + 'T12';
+    const idx = weather.hourly.time.findIndex((t) => t >= targetHour);
+    const i = idx >= 0 ? idx : 0;
+    return {
+      temperature: weather.hourly.temperature_2m[i],
+      windspeed: weather.hourly.windspeed_10m[i],
+      windgusts: weather.hourly.windgusts_10m?.[i] ?? weather.hourly.windspeed_10m[i],
+      winddirection: weather.hourly.winddirection_10m[i],
+      weathercode: weather.hourly.weathercode[i],
+      precipitation: weather.hourly.precipitation[i],
+    };
+  };
+
   const marine = getCurrentMarine();
+  const conditions = getCurrentConditions();
 
   return (
     <div className="card">
@@ -210,32 +250,32 @@ const WeatherWidget: React.FC = () => {
           <button
             type="button"
             className="btn-ghost"
-            onClick={() => setLocation(DEFAULT_LOCATION)}
+            onClick={() => onLocationChange(DEFAULT_LOCATION)}
           >
             ↩
           </button>
         )}
       </form>
 
-      {loading && (
+      {weatherLoading && (
         <div className="flex items-center justify-center h-32 text-gray-500">
           <div className="animate-pulse">Chargement des données météo...</div>
         </div>
       )}
 
-      {error && (
+      {weatherError && (
         <div className="flex items-center gap-3 p-3 bg-red-900/20 border border-red-700/40 rounded-lg mb-3">
-          <span className="text-red-400 text-sm flex-1">{error}</span>
+          <span className="text-red-400 text-sm flex-1">{weatherError}</span>
           <button
             className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors"
-            onClick={() => fetchWeather(location.lat, location.lon, location.name)}
+            onClick={onRetry}
           >
             Réessayer
           </button>
         </div>
       )}
 
-      {weather?.isMock && !loading && (
+      {weather?.isMock && !weatherLoading && (
         <div className="flex items-start gap-2 mb-4 p-3 bg-amber-900/30 border border-amber-600/50 rounded-lg text-amber-300 text-sm">
           <AlertTriangle size={16} className="text-amber-400 mt-0.5 shrink-0" />
           <div>
@@ -245,26 +285,26 @@ const WeatherWidget: React.FC = () => {
         </div>
       )}
 
-      {weather && !loading && (
+      {weather && !weatherLoading && conditions && (
         <>
           {/* Current conditions — row 1: air */}
           <div className="grid grid-cols-2 gap-3 mb-3">
             <div className="bg-navy-900 rounded-lg p-3 flex items-center gap-3">
-              <span className="text-4xl">{weatherEmoji(weather.current.weathercode)}</span>
+              <span className="text-4xl">{weatherEmoji(conditions.weathercode)}</span>
               <div>
-                <p className="text-2xl font-bold text-white">{formatTemp(weather.current.temperature)}</p>
-                <p className="text-xs text-gray-400">{weatherDescription(weather.current.weathercode)}</p>
-                <p className="text-xs text-gray-500">Précip: {weather.current.precipitation.toFixed(1)} mm/h</p>
+                <p className="text-2xl font-bold text-white">{formatTemp(conditions.temperature)}</p>
+                <p className="text-xs text-gray-400">{weatherDescription(conditions.weathercode)}</p>
+                <p className="text-xs text-gray-500">Précip: {conditions.precipitation.toFixed(1)} mm/h</p>
               </div>
             </div>
             <div className="bg-navy-900 rounded-lg p-3">
               <div className="flex items-center gap-1 mb-1">
                 <Wind size={16} className="text-ocean-400" />
-                <span className="text-lg font-bold">{formatWind(weather.current.windspeed)}</span>
-                <span className="text-xs text-gray-500 ml-1">rafales {formatWind(weather.current.windgusts)}</span>
+                <span className="text-lg font-bold">{formatWind(conditions.windspeed)}</span>
+                <span className="text-xs text-gray-500 ml-1">rafales {formatWind(conditions.windgusts)}</span>
               </div>
               <p className="text-xs text-gray-400">
-                {windDirectionLabel(weather.current.winddirection)} ({Math.round(weather.current.winddirection)}°)
+                {windDirectionLabel(conditions.winddirection)} ({Math.round(conditions.winddirection)}°)
               </p>
             </div>
           </div>
@@ -332,7 +372,7 @@ const WeatherWidget: React.FC = () => {
       )}
 
       {/* Source footer */}
-      {weather && !loading && (
+      {weather && !weatherLoading && (
         <p className="text-xs text-gray-700 mt-3 pt-2 border-t border-navy-800">
           Source · Open-Meteo (Forecast + Marine API){weather.isMock ? ' · ⚠️ données fictives' : ` · Mis à jour à ${new Date(weather.current.time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
         </p>

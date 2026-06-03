@@ -164,50 +164,42 @@ function computeDivability(
 
 interface Props {
   selectedDate: string; // "YYYY-MM-DD" ou "" pour aujourd'hui
+  weather: WeatherData | null;
   marineHorizonDate?: string | null;
 }
 
-const DivabilityWidget: React.FC<Props> = ({ selectedDate, marineHorizonDate }) => {
+const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizonDate }) => {
   const { formatWind, formatTemp } = useUnits();
   const { selectedSite } = useSiteAdjustment();
   const multipliers = getSiteMultipliers(selectedSite);
-  const [weather, setWeather] = useState<WeatherData | null>(null);
   const [tidalImpact, setTidalImpact] = useState<TidalImpact | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [score, setScore] = useState<DivabilityScore | null>(null);
 
-  const fetchData = useCallback(async (timestamp?: number) => {
+  const fetchTidalImpact = useCallback(async (timestamp?: number) => {
     setLoading(true);
     setError(null);
     try {
-      const [weatherRes, tideRes] = await Promise.all([
-        axios.get('/api/weather'),
-        axios.get(`/api/tides/impact${timestamp ? `?timestamp=${timestamp}` : ''}`),
-      ]);
-      setWeather(weatherRes.data);
-      setTidalImpact(tideRes.data);
+      const res = await axios.get(`/api/tides/impact${timestamp ? `?timestamp=${timestamp}` : ''}`);
+      setTidalImpact(res.data);
     } catch {
-      setError('Impossible de charger les données de plongeabilité');
+      setError('Impossible de charger les données de marée');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchTidalImpact();
+  }, [fetchTidalImpact]);
 
-  // When selectedDate changes from parent, refetch tidal impact
   useEffect(() => {
-    if (!weather) return;
     if (selectedDate) {
       const ts = new Date(selectedDate + 'T12:00:00').getTime();
-      axios.get(`/api/tides/impact?timestamp=${ts}`)
-        .then((res) => setTidalImpact(res.data))
-        .catch(() => {});
+      fetchTidalImpact(ts);
     }
-  }, [selectedDate, weather]);
+  }, [selectedDate, fetchTidalImpact]);
 
   useEffect(() => {
     if (!weather || !tidalImpact) return;
@@ -242,7 +234,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, marineHorizonDate }) 
 
     const computed = computeDivability(windKnots, waveHeight, precipitation, seaTemp, currentMs, formatWind, formatTemp, multipliers);
     setScore(computed);
-  }, [weather, tidalImpact, selectedDate, multipliers.wind, multipliers.swell, multipliers.current]);
+  }, [weather, tidalImpact, selectedDate, multipliers]);
 
   const beyondMarine = marineHorizonDate
     ? new Date((selectedDate || new Date().toISOString().slice(0, 10)) + 'T12:00:00') > new Date(marineHorizonDate)
@@ -270,7 +262,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, marineHorizonDate }) 
           <span className="text-red-400 text-sm flex-1">{error}</span>
           <button
             className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors"
-            onClick={() => fetchData()}
+            onClick={() => fetchTidalImpact()}
           >
             Réessayer
           </button>

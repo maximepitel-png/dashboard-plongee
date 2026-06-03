@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 /**
@@ -142,55 +141,11 @@ function qualityLabel(score: number): { label: string; color: string; bg: string
 interface Props {
   selectedDay: number;
   tideData: DayTides[];
+  weather: WeatherData | null;
   marineHorizonDate?: string | null;
 }
 
-const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, marineHorizonDate }) => {
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchWeather = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await axios.get('/api/weather');
-      setWeather(res.data);
-    } catch {
-      setError('Impossible de charger les données météo pour le créneau de plongée');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchWeather();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="mb-4 rounded-xl border border-navy-700 bg-navy-800/50 p-4 animate-pulse">
-        <div className="h-4 w-48 bg-navy-700 rounded mb-3" />
-        <div className="h-8 w-64 bg-navy-700 rounded mb-2" />
-        <div className="h-4 w-96 bg-navy-700 rounded" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="mb-4 flex items-center gap-3 p-4 bg-red-900/20 border border-red-700/40 rounded-xl">
-        <span className="text-red-400 text-sm flex-1">{error}</span>
-        <button
-          className="text-xs px-3 py-1.5 rounded-lg bg-red-900/40 text-red-300 hover:bg-red-900/60 transition-colors"
-          onClick={fetchWeather}
-        >
-          Réessayer
-        </button>
-      </div>
-    );
-  }
-
+const DiveDecisionBanner: React.FC<Props> = ({ selectedDay, tideData, weather, marineHorizonDate }) => {
   if (!weather || tideData.length === 0) return null;
 
   const day = tideData[selectedDay];
