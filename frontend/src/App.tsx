@@ -11,6 +11,7 @@ import { UnitProvider } from './contexts/UnitContext';
 import { SiteAdjustmentProvider } from './contexts/SiteAdjustmentContext';
 import { useDiveSites } from './hooks/useDiveSites';
 import UnitSelector from './components/UnitSelector';
+import { computeDayScore } from './utils/diveScore';
 
 interface TideExtreme {
   time: string;
@@ -53,6 +54,7 @@ const AppInner: React.FC = () => {
   const [tidesLoading, setTidesLoading] = React.useState(true);
   const [tidesError, setTidesError] = React.useState<string | null>(null);
   const [selectedDay, setSelectedDay] = React.useState(0);
+  const [scoringWeather, setScoringWeather] = React.useState<any>(null);
 
   React.useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -75,6 +77,10 @@ const AppInner: React.FC = () => {
   React.useEffect(() => {
     fetchTides();
   }, [fetchTides]);
+
+  React.useEffect(() => {
+    axios.get('/api/weather').then((res) => setScoringWeather(res.data)).catch(() => {});
+  }, []);
 
   const formatDate = (d: Date) =>
     d.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -132,22 +138,46 @@ const AppInner: React.FC = () => {
             </div>
           )}
           {!tidesLoading && !tidesError && tideData.length > 0 && (
-            <div className="flex gap-1.5 flex-wrap">
-              {tideData.map((d, i) => (
-                <button
-                  key={d.date}
-                  onClick={() => setSelectedDay(i)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    selectedDay === i ? 'bg-ocean-500 text-white' : 'bg-navy-800 text-gray-400 hover:bg-navy-700'
-                  }`}
-                >
-                  <span className="block">{formatDayTab(d.date)}</span>
-                  <span className="block" style={{ color: getCoefficientColor(d.coefficient) }}>
-                    ~C{d.coefficient}
+            <>
+              <div className="flex gap-1.5 flex-wrap">
+                {tideData.map((d, i) => (
+                  <button
+                    key={d.date}
+                    onClick={() => setSelectedDay(i)}
+                    className={`relative px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      selectedDay === i ? 'bg-ocean-500 text-white' : 'bg-navy-800 text-gray-400 hover:bg-navy-700'
+                    }`}
+                  >
+                    <span className="block">{formatDayTab(d.date)}</span>
+                    <span className="block" style={{ color: getCoefficientColor(d.coefficient) }}>
+                      ~C{d.coefficient}
+                    </span>
+                    {scoringWeather && (() => {
+                      const ds = computeDayScore(d.extremes, scoringWeather, i);
+                      if (ds.quality === 'excellent') return (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-teal-400 border border-navy-800" title="Excellente fenêtre" />
+                      );
+                      if (ds.quality === 'good') return (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 border border-navy-800" title="Bonne fenêtre" />
+                      );
+                      return null;
+                    })()}
+                  </button>
+                ))}
+              </div>
+              {scoringWeather && (
+                <div className="flex items-center gap-4 mt-2 text-xs text-gray-600">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-teal-400 inline-block" />
+                    Excellente fenêtre
                   </span>
-                </button>
-              ))}
-            </div>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+                    Bonne fenêtre
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
 
