@@ -48,6 +48,7 @@ interface Props {
   tidesError: string | null;
   onRetry: () => void;
   weather: WeatherData | null;
+  locationName?: string;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -233,6 +234,7 @@ const TidesWidget: React.FC<Props> = ({
   tidesError,
   onRetry,
   weather,
+  locationName,
 }) => {
   const [thresholdHeight, setThresholdHeight] = useState(2.0);
 
@@ -368,7 +370,7 @@ const TidesWidget: React.FC<Props> = ({
       {/* ── Header ── */}
       <div className="card-header">
         <Waves size={18} className="text-ocean-400" />
-        <span>Marées — Ouistreham</span>
+        <span>Marées — {locationName ?? 'Ouistreham'}</span>
         {currentDay && (
           <span
             className="ml-auto text-sm font-normal"
