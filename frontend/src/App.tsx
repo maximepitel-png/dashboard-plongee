@@ -91,6 +91,12 @@ function saveFavorites(favs: FavoriteLocation[]): void {
   localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
 }
 
+function makeId(): string {
+  // crypto.randomUUID() requires HTTPS; fallback for HTTP (local NAS)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 interface GeoSuggestion {
   id: number;
   name: string;
@@ -236,7 +242,7 @@ const AppInner: React.FC = () => {
     } else {
       const shortName = location.name.includes(' — ') ? location.name.split(' — ')[0] : location.name;
       const newFav: FavoriteLocation = {
-        id: crypto.randomUUID(),
+        id: makeId(),
         name: location.name,
         shortName,
         lat: location.lat,
