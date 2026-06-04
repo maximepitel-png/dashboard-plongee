@@ -175,12 +175,20 @@ const AppInner: React.FC = () => {
   const tapScrollRef = React.useRef<number>(0);
 
   React.useEffect(() => {
+    let lastY = window.scrollY;
+    let ticking = false;
+
     const onScroll = () => {
-      const y = window.scrollY;
-      setBarIsCompact(y > 80);
-      // Dismiss tap-expand after scrolling 300px past the tap point
-      if (barTapped && Math.abs(y - tapScrollRef.current) > 300) {
-        setBarTapped(false);
+      lastY = window.scrollY;
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setBarIsCompact(lastY > 120);
+          if (barTapped && Math.abs(lastY - tapScrollRef.current) > 300) {
+            setBarTapped(false);
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -339,7 +347,7 @@ const AppInner: React.FC = () => {
     <SiteAdjustmentProvider selectedSite={selectedSite}>
     <div className="min-h-screen">
       {/* Header */}
-      <header className="border-b border-navy-700 bg-navy-800/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-navy-700 bg-navy-800/50 backdrop-blur-sm sticky top-0 z-50" style={{ willChange: 'contents' }}>
         {/* Row 1: branding + location + search + units + clock */}
         <div className="max-w-screen-2xl mx-auto px-4 py-3 flex items-center gap-4 flex-wrap">
           {/* Logo */}

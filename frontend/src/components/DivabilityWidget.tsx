@@ -323,10 +323,11 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
         <div className="flex flex-col items-center">
           {/* Circular gauge */}
           <div className="relative mb-4">
-            <svg width="120" height="120" viewBox="0 0 140 140">
+            <svg width="120" height="120" viewBox="0 0 140 140" className="gauge-svg">
               <circle
                 cx="70" cy="70" r="54"
                 fill="none"
+                className="gauge-track"
                 stroke="#0a1628"
                 strokeWidth="12"
               />
@@ -341,10 +342,10 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
                 transform="rotate(-90 70 70)"
                 style={{ transition: 'stroke-dashoffset 0.6s ease, stroke 0.3s ease' }}
               />
-              <text x="70" y="62" textAnchor="middle" className="text-white" fill="white" fontSize="28" fontWeight="bold">
+              <text x="70" y="62" textAnchor="middle" className="gauge-score-text" fill="white" fontSize="28" fontWeight="bold">
                 {score.total}
               </text>
-              <text x="70" y="80" textAnchor="middle" fill="#9ca3af" fontSize="11">
+              <text x="70" y="80" textAnchor="middle" className="gauge-sub-text" fill="#9ca3af" fontSize="11">
                 /100
               </text>
             </svg>

@@ -6,68 +6,81 @@
 
 /* Dark mode (default) */
 :root {
-  --navy-950:  5  14  27;    /* #050e1b */
-  --navy-900: 10  22  40;    /* #0a1628 */
-  --navy-800: 13  33  55;    /* #0d2137 */
-  --navy-700: 15  45  74;    /* #0f2d4a */
-  --navy-600: 19  64  96;    /* #134060 */
-  --ocean-400:  0 180 216;   /* #00b4d8 */
-  --ocean-500:  0 150 183;   /* #0096b7 */
-  --ocean-600:  0 122 150;   /* #007a96 */
-  --ocean-900:  0  45  60;   /* #002d3c */
+  --navy-950:  5  14  27;
+  --navy-900: 10  22  40;
+  --navy-800: 13  33  55;
+  --navy-700: 15  45  74;
+  --navy-600: 19  64  96;
+  --ocean-400:  0 180 216;
+  --ocean-500:  0 150 183;
+  --ocean-600:  0 122 150;
+  --ocean-900:  0  45  60;
 
-  --bg-body:       10 22 40;
-  --text-primary:  255 255 255;
-  --text-muted:    156 163 175;  /* gray-400 */
-  --text-subtle:   107 114 128;  /* gray-500 */
+  --color-body:       10 22 40;
+  --color-text:       255 255 255;
+  --color-muted:      156 163 175;
+  --color-subtle:     107 114 128;
+
   --gradient-1: rgba(0, 180, 216, 0.05);
   --gradient-2: rgba(0, 150, 183, 0.03);
   --scrollbar-track: #0a1628;
   --scrollbar-thumb: #134060;
-  --recharts-grid: rgba(255,255,255,0.05);
-  --recharts-text: #9ca3af;
-  --tooltip-bg: #0d2137;
-  --tooltip-border: #134060;
+  --recharts-grid:   rgba(255,255,255,0.05);
+  --recharts-text:   #9ca3af;
+  --recharts-axis:   #0f2d4a;
+  --tooltip-bg:      #0d2137;
+  --tooltip-border:  #134060;
+  --tooltip-color:   #ffffff;
+  --gauge-track:     #0a1628;
+  --gauge-score:     #ffffff;
+  --gauge-sub:       #9ca3af;
 }
 
-/* Light mode */
+/* Light mode — palette "Mer de jour" */
 html.light {
-  --navy-950: 226 232 240;   /* slate-200 */
-  --navy-900: 241 245 249;   /* slate-100 */
-  --navy-800: 255 255 255;   /* white */
-  --navy-700: 226 232 240;   /* slate-200 */
-  --navy-600: 203 213 225;   /* slate-300 */
-  --ocean-400:  0 150 183;   /* slightly deeper for contrast on white */
-  --ocean-500:  0 122 150;
+  /* navy → sky-slate scale */
+  --navy-950: 220 232 245;   /* inner tracks, deepest bg */
+  --navy-900: 234 243 251;   /* surfaces inside cards */
+  --navy-800: 255 255 255;   /* cards */
+  --navy-700: 213 228 242;   /* borders, bars, dividers */
+  --navy-600: 178 204 224;   /* stronger borders */
+  --ocean-400:  0 148 180;   /* slightly deeper for white bg contrast */
+  --ocean-500:  0 120 148;
   --ocean-600:  0  96 120;
-  --ocean-900: 224 242 248;  /* very light teal tint */
+  --ocean-900: 220 244 250;  /* very light teal tint for selected areas */
 
-  --bg-body:       234 241 248;
-  --text-primary:  15  23  42;   /* slate-900 */
-  --text-muted:    71  85 105;   /* slate-600 */
-  --text-subtle:  100 116 139;   /* slate-500 */
-  --gradient-1: rgba(0, 150, 183, 0.06);
+  --color-body:      225 237 248;   /* soft sky blue body */
+  --color-text:       26  54  93;   /* deep navy text */
+  --color-muted:      74 107 143;   /* medium blue-gray */
+  --color-subtle:    130 157 181;   /* lighter blue-gray */
+
+  --gradient-1: rgba(0, 148, 180, 0.07);
   --gradient-2: rgba(0, 96, 120, 0.04);
-  --scrollbar-track: #e2e8f0;
-  --scrollbar-thumb: #94a3b8;
-  --recharts-grid: rgba(0,0,0,0.06);
-  --recharts-text: #64748b;
-  --tooltip-bg: #ffffff;
-  --tooltip-border: #e2e8f0;
+  --scrollbar-track: #d5e4f2;
+  --scrollbar-thumb: #9dbdd6;
+  --recharts-grid:   rgba(26,54,93,0.07);
+  --recharts-text:   #6b8fad;
+  --recharts-axis:   #d5e4f2;
+  --tooltip-bg:      #ffffff;
+  --tooltip-border:  #d5e4f2;
+  --tooltip-color:   #1a365d;
+  --gauge-track:     #d5e4f2;
+  --gauge-score:     #1a365d;
+  --gauge-sub:       #7a9ab5;
 }
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
 
 @layer base {
   body {
-    background-color: rgb(var(--bg-body));
-    color: rgb(var(--text-primary));
+    background-color: rgb(var(--color-body));
+    color: rgb(var(--color-text));
     @apply font-sans;
     background-image:
       radial-gradient(ellipse at 20% 50%, var(--gradient-1) 0%, transparent 50%),
       radial-gradient(ellipse at 80% 20%, var(--gradient-2) 0%, transparent 40%);
     min-height: 100vh;
-    transition: background-color 200ms ease, color 200ms ease;
+    transition: background-color 250ms ease, color 250ms ease;
   }
 }
 
@@ -76,6 +89,7 @@ html.light {
 @layer components {
   .card {
     @apply bg-navy-800 rounded-xl border border-navy-700 p-4 shadow-lg;
+    transition: background-color 250ms ease, border-color 250ms ease;
   }
 
   .card-header {
@@ -96,7 +110,7 @@ html.light {
 
   .btn-ghost {
     @apply btn bg-transparent hover:bg-navy-700;
-    color: rgb(var(--text-muted));
+    color: rgb(var(--color-muted));
   }
 
   .btn-danger {
@@ -106,7 +120,7 @@ html.light {
   .input {
     @apply bg-navy-900 border border-navy-600 rounded-lg px-3 py-2 text-sm
            focus:outline-none focus:border-ocean-400 transition-colors;
-    color: rgb(var(--text-primary));
+    color: rgb(var(--color-text));
   }
 
   .select {
@@ -114,28 +128,53 @@ html.light {
   }
 }
 
-/* ── Light mode text overrides ─────────────────────────────────────────────── */
+/* ── Light mode overrides ──────────────────────────────────────────────────── */
 
-/* text-white → dark text in light mode */
-html.light .text-white { color: rgb(15 23 42) !important; }
-html.light .text-gray-300 { color: rgb(71 85 105) !important; }
-html.light .text-gray-400 { color: rgb(100 116 139) !important; }
-html.light .text-gray-500 { color: rgb(100 116 139) !important; }
-html.light .text-gray-600 { color: rgb(148 163 184) !important; }
-html.light .text-gray-700 { color: rgb(148 163 184) !important; }
+html.light {
+  color-scheme: light;
+}
 
-/* Header backdrop */
+/* Text colors */
+html.light .text-white    { color: rgb(26 54 93) !important; }
+html.light .text-gray-300 { color: rgb(74 107 143) !important; }
+html.light .text-gray-400 { color: rgb(100 130 160) !important; }
+html.light .text-gray-500 { color: rgb(120 150 178) !important; }
+html.light .text-gray-600 { color: rgb(148 175 200) !important; }
+html.light .text-gray-700 { color: rgb(160 186 208) !important; }
+
+/* Header */
 html.light header {
-  background-color: rgb(255 255 255 / 0.85) !important;
-  border-color: rgb(203 213 225) !important;
+  background-color: rgba(255,255,255,0.88) !important;
+  border-color: rgb(213 228 242) !important;
+  backdrop-filter: blur(12px);
 }
 
-/* Card shadow more visible in light */
+/* Card shadow */
 html.light .card {
-  box-shadow: 0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 8px rgba(26,54,93,0.08), 0 1px 2px rgba(26,54,93,0.05);
 }
 
-/* ── Recharts ───────────────────────────────────────────────────────────────── */
+/* Gauge SVG — hardcoded colors made themeable */
+html.light .gauge-track          { stroke: var(--gauge-track) !important; }
+html.light .gauge-score-text     { fill: var(--gauge-score) !important; }
+html.light .gauge-sub-text       { fill: var(--gauge-sub) !important; }
+
+/* Recharts — axis lines and ticks */
+html.light .recharts-cartesian-axis-line  { stroke: var(--recharts-axis) !important; }
+html.light .recharts-cartesian-axis-tick-value { fill: var(--recharts-text) !important; }
+html.light .recharts-label { fill: var(--recharts-text) !important; }
+
+/* Reference areas in light mode — more transparent */
+html.light .recharts-reference-area-rect { fill-opacity: 0.12 !important; }
+
+/* Buttons in light mode */
+html.light .btn-ghost { color: rgb(74 107 143) !important; }
+html.light .btn-danger {
+  background-color: rgba(254,226,226,0.8) !important;
+  color: #b91c1c !important;
+}
+
+/* ── Recharts global (both modes) ──────────────────────────────────────────── */
 
 .recharts-cartesian-grid-horizontal line,
 .recharts-cartesian-grid-vertical line {
@@ -151,7 +190,7 @@ html.light .card {
   background-color: var(--tooltip-bg) !important;
   border: 1px solid var(--tooltip-border) !important;
   border-radius: 8px !important;
-  color: rgb(var(--text-primary)) !important;
+  color: var(--tooltip-color) !important;
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────────── */
@@ -159,12 +198,12 @@ html.light .card {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #00b4d8; }
+::-webkit-scrollbar-thumb:hover { background: #0096b7; }
 
 /* ── Wave animation ─────────────────────────────────────────────────────────── */
 
 @keyframes wave {
-  0% { transform: translateX(0); }
+  0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
 .wave-anim { animation: wave 8s linear infinite; }
