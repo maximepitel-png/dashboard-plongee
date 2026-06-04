@@ -149,6 +149,20 @@ async function fetchSuggestions(input: string): Promise<GeoSuggestion[]> {
 const AppInner: React.FC = () => {
   const { selectedSite } = useDiveSites();
   const { formatWind, formatTemp } = useUnits();
+
+  // ── Theme (light/dark) ───────────────────────────────────────────────────
+  const [isDark, setIsDark] = React.useState<boolean>(() => {
+    return localStorage.getItem('dive-dashboard-theme') !== 'light';
+  });
+  React.useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.remove('light');
+      localStorage.setItem('dive-dashboard-theme', 'dark');
+    } else {
+      document.documentElement.classList.add('light');
+      localStorage.setItem('dive-dashboard-theme', 'light');
+    }
+  }, [isDark]);
   const [currentTime, setCurrentTime] = React.useState(new Date());
   const [tideData, setTideData] = React.useState<DayTides[]>([]);
   const [tidesLoading, setTidesLoading] = React.useState(true);
@@ -429,9 +443,33 @@ const AppInner: React.FC = () => {
             </div>
           </div>
 
-          {/* Units + clock */}
+          {/* Units + theme + clock */}
           <div className="flex items-center gap-3 shrink-0">
             <UnitSelector />
+            {/* Light/dark toggle */}
+            <button
+              type="button"
+              onClick={() => setIsDark((v) => !v)}
+              title={isDark ? 'Passer en mode clair' : 'Passer en mode sombre'}
+              className="p-1.5 rounded-lg hover:bg-navy-700 transition-colors"
+              aria-label="Basculer thème"
+            >
+              {isDark ? (
+                /* Sun icon */
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4"/>
+                  <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+                  <line x1="4.22" y1="4.22" x2="7.05" y2="7.05"/><line x1="16.95" y1="16.95" x2="19.78" y2="19.78"/>
+                  <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+                  <line x1="4.22" y1="19.78" x2="7.05" y2="16.95"/><line x1="16.95" y1="7.05" x2="19.78" y2="4.22"/>
+                </svg>
+              ) : (
+                /* Moon icon */
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+              )}
+            </button>
             <div className="text-right hidden md:block">
               <p className="text-xs text-gray-400 capitalize">{formatDate(currentTime)}</p>
               <p className="text-xs text-gray-600">

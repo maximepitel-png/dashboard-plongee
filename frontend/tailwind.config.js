@@ -4,16 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
+        // CSS-variable driven — preserves opacity modifiers (bg-navy-800/50, etc.)
         navy: {
-          900: '#0a1628',
-          800: '#0d2137',
-          700: '#0f2d4a',
-          600: '#134060',
+          950: 'rgb(var(--navy-950) / <alpha-value>)',
+          900: 'rgb(var(--navy-900) / <alpha-value>)',
+          800: 'rgb(var(--navy-800) / <alpha-value>)',
+          700: 'rgb(var(--navy-700) / <alpha-value>)',
+          600: 'rgb(var(--navy-600) / <alpha-value>)',
         },
         ocean: {
-          400: '#00b4d8',
-          500: '#0096b7',
-          600: '#007a96',
+          400: 'rgb(var(--ocean-400) / <alpha-value>)',
+          500: 'rgb(var(--ocean-500) / <alpha-value>)',
+          600: 'rgb(var(--ocean-600) / <alpha-value>)',
+          900: 'rgb(var(--ocean-900) / <alpha-value>)',
         },
         coral: '#ff6b6b',
         seafoam: '#48cae4',

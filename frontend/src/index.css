@@ -2,15 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme variables ───────────────────────────────────────────────────────── */
+
+/* Dark mode (default) */
+:root {
+  --navy-950:  5  14  27;    /* #050e1b */
+  --navy-900: 10  22  40;    /* #0a1628 */
+  --navy-800: 13  33  55;    /* #0d2137 */
+  --navy-700: 15  45  74;    /* #0f2d4a */
+  --navy-600: 19  64  96;    /* #134060 */
+  --ocean-400:  0 180 216;   /* #00b4d8 */
+  --ocean-500:  0 150 183;   /* #0096b7 */
+  --ocean-600:  0 122 150;   /* #007a96 */
+  --ocean-900:  0  45  60;   /* #002d3c */
+
+  --bg-body:       10 22 40;
+  --text-primary:  255 255 255;
+  --text-muted:    156 163 175;  /* gray-400 */
+  --text-subtle:   107 114 128;  /* gray-500 */
+  --gradient-1: rgba(0, 180, 216, 0.05);
+  --gradient-2: rgba(0, 150, 183, 0.03);
+  --scrollbar-track: #0a1628;
+  --scrollbar-thumb: #134060;
+  --recharts-grid: rgba(255,255,255,0.05);
+  --recharts-text: #9ca3af;
+  --tooltip-bg: #0d2137;
+  --tooltip-border: #134060;
+}
+
+/* Light mode */
+html.light {
+  --navy-950: 226 232 240;   /* slate-200 */
+  --navy-900: 241 245 249;   /* slate-100 */
+  --navy-800: 255 255 255;   /* white */
+  --navy-700: 226 232 240;   /* slate-200 */
+  --navy-600: 203 213 225;   /* slate-300 */
+  --ocean-400:  0 150 183;   /* slightly deeper for contrast on white */
+  --ocean-500:  0 122 150;
+  --ocean-600:  0  96 120;
+  --ocean-900: 224 242 248;  /* very light teal tint */
+
+  --bg-body:       234 241 248;
+  --text-primary:  15  23  42;   /* slate-900 */
+  --text-muted:    71  85 105;   /* slate-600 */
+  --text-subtle:  100 116 139;   /* slate-500 */
+  --gradient-1: rgba(0, 150, 183, 0.06);
+  --gradient-2: rgba(0, 96, 120, 0.04);
+  --scrollbar-track: #e2e8f0;
+  --scrollbar-thumb: #94a3b8;
+  --recharts-grid: rgba(0,0,0,0.06);
+  --recharts-text: #64748b;
+  --tooltip-bg: #ffffff;
+  --tooltip-border: #e2e8f0;
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+
 @layer base {
   body {
-    @apply bg-navy-900 text-white font-sans;
+    background-color: rgb(var(--bg-body));
+    color: rgb(var(--text-primary));
+    @apply font-sans;
     background-image:
-      radial-gradient(ellipse at 20% 50%, rgba(0, 180, 216, 0.05) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 20%, rgba(0, 150, 183, 0.03) 0%, transparent 40%);
+      radial-gradient(ellipse at 20% 50%, var(--gradient-1) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, var(--gradient-2) 0%, transparent 40%);
     min-height: 100vh;
+    transition: background-color 200ms ease, color 200ms ease;
   }
 }
+
+/* ── Components ────────────────────────────────────────────────────────────── */
 
 @layer components {
   .card {
@@ -34,7 +95,8 @@
   }
 
   .btn-ghost {
-    @apply btn bg-transparent hover:bg-navy-700 text-gray-300;
+    @apply btn bg-transparent hover:bg-navy-700;
+    color: rgb(var(--text-muted));
   }
 
   .btn-danger {
@@ -42,8 +104,9 @@
   }
 
   .input {
-    @apply bg-navy-900 border border-navy-600 rounded-lg px-3 py-2 text-white text-sm
+    @apply bg-navy-900 border border-navy-600 rounded-lg px-3 py-2 text-sm
            focus:outline-none focus:border-ocean-400 transition-colors;
+    color: rgb(var(--text-primary));
   }
 
   .select {
@@ -51,45 +114,57 @@
   }
 }
 
-/* Tide chart styling */
+/* ── Light mode text overrides ─────────────────────────────────────────────── */
+
+/* text-white → dark text in light mode */
+html.light .text-white { color: rgb(15 23 42) !important; }
+html.light .text-gray-300 { color: rgb(71 85 105) !important; }
+html.light .text-gray-400 { color: rgb(100 116 139) !important; }
+html.light .text-gray-500 { color: rgb(100 116 139) !important; }
+html.light .text-gray-600 { color: rgb(148 163 184) !important; }
+html.light .text-gray-700 { color: rgb(148 163 184) !important; }
+
+/* Header backdrop */
+html.light header {
+  background-color: rgb(255 255 255 / 0.85) !important;
+  border-color: rgb(203 213 225) !important;
+}
+
+/* Card shadow more visible in light */
+html.light .card {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
+}
+
+/* ── Recharts ───────────────────────────────────────────────────────────────── */
+
 .recharts-cartesian-grid-horizontal line,
 .recharts-cartesian-grid-vertical line {
-  stroke: rgba(255, 255, 255, 0.05);
+  stroke: var(--recharts-grid);
 }
 
 .recharts-text {
-  fill: #9ca3af;
+  fill: var(--recharts-text);
   font-size: 11px;
 }
 
 .recharts-tooltip-wrapper .recharts-default-tooltip {
-  background-color: #0d2137 !important;
-  border: 1px solid #134060 !important;
+  background-color: var(--tooltip-bg) !important;
+  border: 1px solid var(--tooltip-border) !important;
   border-radius: 8px !important;
+  color: rgb(var(--text-primary)) !important;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #0a1628;
-}
-::-webkit-scrollbar-thumb {
-  background: #134060;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #00b4d8;
-}
+/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
 
-/* Wave animation */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #00b4d8; }
+
+/* ── Wave animation ─────────────────────────────────────────────────────────── */
+
 @keyframes wave {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
-
-.wave-anim {
-  animation: wave 8s linear infinite;
-}
+.wave-anim { animation: wave 8s linear infinite; }
