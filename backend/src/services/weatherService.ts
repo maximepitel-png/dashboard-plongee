@@ -1,5 +1,6 @@
 import axios from 'axios';
 import NodeCache from 'node-cache';
+import { computeClarityTimeseries, ClarityPoint } from './clarityService';
 
 const cache = new NodeCache({ stdTTL: 600 });
 
@@ -60,6 +61,7 @@ export interface WeatherData {
   };
   marineHorizonDate?: string;
   isMock?: boolean;
+  clarity?: ClarityPoint[];
 }
 
 function generateMockData(lat: number, lon: number, locationName: string): WeatherData {
@@ -241,6 +243,20 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
       marineHorizonDate: marineRes.data.hourly.time[marineRes.data.hourly.time.length - 1] ?? new Date().toISOString(),
       location: { lat, lon, name: locationName },
     };
+
+    // Clarté de l'eau — calculée après coup, ne bloque pas le cache météo
+    try {
+      data.clarity = await computeClarityTimeseries(
+        {
+          time:        marineRes.data.hourly.time,
+          wave_height: marineRes.data.hourly.wave_height,
+          wave_period: marineRes.data.hourly.wave_period,
+        },
+        weatherRes.data.hourly.time,
+      );
+    } catch {
+      // Dégrade silencieusement : pas de clarté plutôt qu'une erreur
+    }
 
     cache.set(cacheKey, data);
     return data;
