@@ -14,7 +14,7 @@ services:
       - FRONTEND_URL=http://localhost:3000
       # Clé api-maree.fr (données Ifremer/PREVIMER) — obligatoire pour les marées
       # Créer un compte sur https://api-maree.fr puis décommenter :
-      # - MAREE_API_KEY=votre_clé_ici
+      - MAREE_API_KEY=${MAREE_API_KEY}
     volumes:
       - ./data:/app/data
     networks:
@@ -35,6 +35,29 @@ services:
       - "3080:80"
     depends_on:
       - backend
+    networks:
+      - plongee-net
+
+  # Job quotidien : télécharge les données Copernicus Marine (ZSD/KD490/SPM/CHL)
+  # et écrit ./data/satellite_clarity.json — le backend le lit sans jamais dépendre
+  # de la disponibilité de l'API Copernicus au moment du rendu.
+  #
+  # Variables requises dans .env :
+  #   COPERNICUS_USER=votre_identifiant_copernicus_marine
+  #   COPERNICUS_PASSWORD=votre_mot_de_passe_copernicus_marine
+  # Créer un compte gratuit sur https://marine.copernicus.eu
+  satellite-clarity:
+    build:
+      context: ./satellite
+      dockerfile: Dockerfile
+    container_name: dashboard-plongee-satellite
+    restart: unless-stopped
+    environment:
+      - DATA_DIR=/app/data
+      - COPERNICUS_USER=${COPERNICUS_USER}
+      - COPERNICUS_PASSWORD=${COPERNICUS_PASSWORD}
+    volumes:
+      - ./data:/app/data
     networks:
       - plongee-net
 

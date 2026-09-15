@@ -4,12 +4,20 @@
  * Calcule un coefficient d'atténuation diffuse Kd (m⁻¹) par pas horaire.
  * Visibilité estimée : visibilityM ≈ 2.04 / Kd
  *
- * Trois contributions :
- *   1. Panache de l'Orne (Hub'Eau hydrométrie — débit vs médiane saisonnière)
- *   2. Remise en suspension par la houle (Open-Meteo marine, vitesse orbitale au fond)
- *   3. Phytoplancton (climatologie mensuelle — point d'extension satellite prompt 4)
+ * Hiérarchie des sources (par ordre de priorité décroissante) :
+ *   1. Satellite Copernicus (KD490/ZSD) — si ./data/satellite_clarity.json < 3 jours
+ *   2. Modèle calculé (prompt 3) : panache Orne + remise en suspension houle + phytoplancton
+ *   3. Climatologie mensuelle seule
+ *
+ * Note sur CHL/SPM Copernicus :
+ *   En eaux côtières turbides (Manche orientale), CHL est biaisée vers le haut
+ *   par la réflectance des sédiments et de la CDOM. Seuls ZSD et KD490 alimentent
+ *   le calcul de Kd ; CHL et SPM servent uniquement à attribuer la cause
+ *   (bloom vs sédiment) pour l'affichage — jamais comme entrée quantitative.
  */
 
+import fs from 'fs';
+import path from 'path';
 import axios from 'axios';
 import NodeCache from 'node-cache';
 
@@ -22,6 +30,15 @@ const SITE_DEPTH_M = 12;
 
 /** Kd de fond (eau claire, Manche : ~0.08 m⁻¹) */
 const KD_BACKGROUND = 0.08;
+
+/** Chemin du fichier JSON produit par le job Copernicus */
+const SATELLITE_FILE = path.join(
+  process.env.DATA_DIR ?? path.join(__dirname, '../../..', 'data'),
+  'satellite_clarity.json',
+);
+
+/** Un fichier satellite de plus de 3 jours est considéré trop ancien */
+const SATELLITE_MAX_AGE_MS = 3 * 24 * 3600 * 1000;
 
 /**
  * Station débitmètre repli : L'Orne à Caen — Pont de Vaucelles (H1422510).
@@ -317,8 +334,80 @@ function computeKdWave(
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Source satellite Copernicus (priorité 1)
+// ---------------------------------------------------------------------------
+
+interface SatellitePoint {
+  date:        string;         // YYYY-MM-DD
+  kd:          number | null;  // Kd composite (KD490 ou dérivé de ZSD)
+  kd_source:   string;
+  kd490:       number | null;
+  kd_from_zsd: number | null;
+  zsd:         number | null;
+  chl:         number | null;  // informative seulement (peu fiable en eaux turbides côtières)
+  spm:         number | null;  // informative seulement
+  cause:       string;         // "bloom" | "sédiment" | "turbidité faible" | "inconnu"
+  n_pixels:    number;
+  chl_reliable: boolean;
+}
+
+interface SatelliteFile {
+  fetched_at: string;
+  points:     SatellitePoint[];
+}
+
+interface SatelliteKd {
+  kd: number;
+  cause: string;
+  kdSource: string;
+  confidence: number;
+}
+
+/**
+ * Lit le fichier satellite et retourne le Kd le plus récent (≤ 3 jours).
+ * Retourne null si le fichier est absent, trop ancien, ou sans donnée valide.
+ */
+function readSatelliteKd(now: Date): SatelliteKd | null {
+  try {
+    if (!fs.existsSync(SATELLITE_FILE)) return null;
+
+    const raw = fs.readFileSync(SATELLITE_FILE, 'utf-8');
+    const data: SatelliteFile = JSON.parse(raw);
+
+    const fetchedAt = new Date(data.fetched_at);
+    if (now.getTime() - fetchedAt.getTime() > SATELLITE_MAX_AGE_MS) {
+      return null; // fichier trop ancien
+    }
+
+    // Point le plus récent avec un Kd valide
+    const valid = (data.points ?? [])
+      .filter((p) => p.kd != null && p.n_pixels >= 3)
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    if (valid.length === 0) return null;
+
+    const latest = valid[0];
+    const ageDays = (now.getTime() - new Date(latest.date + 'T12:00:00Z').getTime())
+      / (24 * 3600 * 1000);
+
+    // Confiance : 1.0 si même jour, décroit avec l'âge
+    const confidence = Math.max(0.6, 1 - ageDays * 0.12);
+
+    return {
+      kd:         latest.kd!,
+      cause:      latest.cause,
+      kdSource:   latest.kd_source,
+      confidence: +confidence.toFixed(2),
+    };
+  } catch {
+    return null; // lecture silencieuse en échec
+  }
+}
+
+
 // Contribution 3 — Phytoplancton (climatologie mensuelle)
-// Point d'extension : remplacer par satellite (prompt 4)
+// Point d'extension satellite : registerSatelliteKdProvider() ci-dessous
 // ---------------------------------------------------------------------------
 
 /**
@@ -375,38 +464,93 @@ export async function computeClarityTimeseries(
 
   const now = new Date();
 
-  // Contributions asynchrones
-  const [orneResult] = await Promise.all([
-    computeKdOrne(marineHourly.time, now),
-  ]);
+  // -------------------------------------------------------------------------
+  // Hiérarchie des sources
+  // -------------------------------------------------------------------------
 
-  const kdOrne = orneResult.kd;
-  const orneConfidence = orneResult.confidence;
+  // Priorité 1 : données satellite (fichier produit par le job Copernicus)
+  const satellite = readSatelliteKd(now);
 
-  // Construction de la série horaire
+  if (satellite) {
+    // Le satellite fournit un Kd journalier unique — on l'applique à toute la série
+    // en ajoutant la contribution houle horaire par-dessus
+    const [orneResult] = await Promise.all([computeKdOrne(marineHourly.time, now)]);
+
+    const result: ClarityPoint[] = forecastTimes.map((t) => {
+      const time   = new Date(t);
+      const kdWave = computeKdWave(marineHourly, time);
+
+      // Satellite remplace fond + phytoplancton + Orne, mais pas la houle (dynamique)
+      const kd = satellite.kd + kdWave;
+      const visibilityM = 2.04 / Math.max(kd, 0.01);
+
+      const sources: string[] = [`satellite (${satellite.kdSource})`];
+      if (satellite.cause && satellite.cause !== 'inconnu') sources.push(satellite.cause);
+      if (kdWave > 0.01) sources.push('remise en suspension');
+
+      return {
+        time: t,
+        kd:  +kd.toFixed(4),
+        visibilityM: +visibilityM.toFixed(1),
+        source: sources.join(' + '),
+        confidence: +Math.min(1, satellite.confidence * (orneResult.confidence)).toFixed(2),
+      };
+    });
+
+    clarityCache.set(cacheKey, result);
+    return result;
+  }
+
+  // Priorité 2 : modèle calculé (panache Orne + houle + phytoplancton)
+  const [orneResult] = await Promise.all([computeKdOrne(marineHourly.time, now)]);
+  const orneAvailable = orneResult.confidence >= 1;
+
+  if (orneAvailable || orneResult.kd > 0) {
+    const kdOrne = orneResult.kd;
+
+    const result: ClarityPoint[] = forecastTimes.map((t) => {
+      const time    = new Date(t);
+      const kdWave  = computeKdWave(marineHourly, time);
+      const kdPhyto = computeKdPhyto(time);
+
+      const kd = KD_BACKGROUND + kdOrne + kdWave + kdPhyto;
+      const visibilityM = 2.04 / kd;
+
+      const sources: string[] = ['modèle'];
+      if (kdOrne > 0.01)  sources.push('panache Orne');
+      if (kdWave > 0.01)  sources.push('remise en suspension');
+      sources.push('phytoplancton');
+
+      const confidence = orneResult.confidence * 0.85; // modèle < satellite
+
+      return {
+        time: t,
+        kd:  +kd.toFixed(4),
+        visibilityM: +visibilityM.toFixed(1),
+        source: sources.join(' + '),
+        confidence: +Math.min(1, confidence).toFixed(2),
+      };
+    });
+
+    clarityCache.set(cacheKey, result);
+    return result;
+  }
+
+  // Priorité 3 : climatologie seule (fallback de dernier recours)
   const result: ClarityPoint[] = forecastTimes.map((t) => {
-    const time  = new Date(t);
-    const kdWave  = computeKdWave(marineHourly, time);
+    const time    = new Date(t);
     const kdPhyto = computeKdPhyto(time);
+    const kdWave  = computeKdWave(marineHourly, time);
 
-    // Pour l'Orne, on utilise la valeur calculée une fois (débit journalier)
-    const kd = KD_BACKGROUND + kdOrne + kdWave + kdPhyto;
+    const kd = KD_BACKGROUND + kdWave + kdPhyto;
     const visibilityM = 2.04 / kd;
-
-    const sources: string[] = ['fond'];
-    if (kdOrne > 0.01)  sources.push('panache Orne');
-    if (kdWave > 0.01)  sources.push('remise en suspension');
-    sources.push('phytoplancton');
-
-    // Confiance : réduite si Hub'Eau indisponible
-    const confidence = orneConfidence * (kdWave > 0 || orneConfidence === 1 ? 1 : 0.8);
 
     return {
       time: t,
       kd:  +kd.toFixed(4),
       visibilityM: +visibilityM.toFixed(1),
-      source: sources.join(' + '),
-      confidence: +Math.min(1, confidence).toFixed(2),
+      source: 'climatologie',
+      confidence: 0.30,
     };
   });
 
