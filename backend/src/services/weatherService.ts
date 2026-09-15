@@ -1,6 +1,7 @@
 import axios from 'axios';
 import NodeCache from 'node-cache';
 import { computeClarityTimeseries, ClarityPoint } from './clarityService';
+import { findLampRequiredHour } from './lightModel';
 
 const cache = new NodeCache({ stdTTL: 600 });
 
@@ -28,6 +29,7 @@ export interface WeatherData {
     visibility: number[];
     surface_pressure: number[];
     uv_index: number[];
+    shortwave_radiation: number[];
   };
   marine: {
     hourly: {
@@ -62,6 +64,7 @@ export interface WeatherData {
   marineHorizonDate?: string;
   isMock?: boolean;
   clarity?: ClarityPoint[];
+  lampRequiredAfter?: string | null;
 }
 
 function generateMockData(lat: number, lon: number, locationName: string): WeatherData {
@@ -92,6 +95,7 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
   const visibility: number[] = [];
   const surfacePressure: number[] = [];
   const uvIndex: number[] = [];
+  const shortwaveRad: number[] = [];
 
   for (let i = 0; i < 360; i++) {
     const t = new Date(now.getTime() + i * 3600000);
@@ -111,6 +115,10 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
     visibility.push(Math.max(1000, 20000 - cc * 150));
     surfacePressure.push(Math.round(1013 + Math.sin(i * 0.05) * 8));
     uvIndex.push(Math.max(0, Math.round(4 + Math.sin((i % 24 - 13) * 0.4) * 4)));
+    // Rayonnement solaire : pic à midi locale (~13h UTC+1), nul la nuit
+    const hourOfDay = t.getUTCHours();
+    const swBase = Math.max(0, Math.sin((hourOfDay - 6) * Math.PI / 14));
+    shortwaveRad.push(+(swBase * swBase * 700 * (1 - cc / 200)).toFixed(0));
     if (i < 168) {
       marineTimes.push(t.toISOString().slice(0, 16));
       const wh = +(0.4 + Math.sin(i / 20) * 0.3 + Math.random() * 0.2).toFixed(2);
@@ -163,6 +171,7 @@ function generateMockData(lat: number, lon: number, locationName: string): Weath
       visibility,
       surface_pressure: surfacePressure,
       uv_index: uvIndex,
+      shortwave_radiation: shortwaveRad,
     },
     daily: { sunrise: sunrises, sunset: sunsets },
     marineHorizonDate: marineTimes[marineTimes.length - 1] ?? new Date().toISOString(),
@@ -200,7 +209,7 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
           latitude: lat,
           longitude: lon,
           current: 'temperature_2m,windspeed_10m,winddirection_10m,weathercode,precipitation,windgusts_10m',
-          hourly: 'temperature_2m,windspeed_10m,windgusts_10m,winddirection_10m,precipitation,weathercode,apparent_temperature,cloudcover,precipitation_probability,visibility,surface_pressure,uv_index',
+          hourly: 'temperature_2m,windspeed_10m,windgusts_10m,winddirection_10m,precipitation,weathercode,apparent_temperature,cloudcover,precipitation_probability,visibility,surface_pressure,uv_index,shortwave_radiation',
           daily: 'sunrise,sunset',
           forecast_days: 16,
           wind_speed_unit: 'kn',
@@ -244,7 +253,7 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
       location: { lat, lon, name: locationName },
     };
 
-    // Clarté de l'eau — calculée après coup, ne bloque pas le cache météo
+    // Clarté de l'eau + lumière sous-marine — calculées après coup
     try {
       data.clarity = await computeClarityTimeseries(
         {
@@ -253,7 +262,24 @@ export async function fetchWeather(lat: number, lon: number, locationName: strin
           wave_period: marineRes.data.hourly.wave_period,
         },
         weatherRes.data.hourly.time,
+        {
+          shortwave_radiation: weatherRes.data.hourly.shortwave_radiation,
+          cloudcover:          weatherRes.data.hourly.cloudcover,
+          times:               weatherRes.data.hourly.time,
+        },
+        lat,
+        lon,
       );
+
+      if (data.clarity) {
+        const profiles = data.clarity.map((p) => p.light).filter(Boolean) as any[];
+        if (profiles.length > 0) {
+          data.lampRequiredAfter = findLampRequiredHour(
+            data.clarity.map((p) => p.time),
+            profiles,
+          );
+        }
+      }
     } catch {
       // Dégrade silencieusement : pas de clarté plutôt qu'une erreur
     }

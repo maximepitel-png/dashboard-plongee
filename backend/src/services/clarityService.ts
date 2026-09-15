@@ -20,6 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import NodeCache from 'node-cache';
+import { solarElevation, computeLightProfile, LightProfile } from './lightModel';
 
 // ---------------------------------------------------------------------------
 // Constantes site
@@ -68,6 +69,7 @@ export interface ClarityPoint {
   visibilityM: number; // ≈ 2.04 / kd
   source: string;    // libellé des contributions actives
   confidence: number; // 0-1
+  light?: LightProfile; // profil lumineux sous-marin (si shortwave disponible)
 }
 
 // ---------------------------------------------------------------------------
@@ -457,12 +459,36 @@ export async function computeClarityTimeseries(
     wave_period: number[];
   },
   forecastTimes: string[],
+  atmosphere?: {
+    shortwave_radiation: number[];
+    cloudcover: number[];
+    times: string[];
+  },
+  siteLat = 49.277,
+  siteLon = -0.246,
 ): Promise<ClarityPoint[]> {
   const cacheKey = `clarity_${forecastTimes[0] ?? 'now'}`;
   const cached = clarityCache.get<ClarityPoint[]>(cacheKey);
   if (cached) return cached;
 
   const now = new Date();
+
+  // Lookup index pour shortwave/cloudcover (alignés sur forecastTimes)
+  const atmIndexMap = new Map<string, number>();
+  if (atmosphere) {
+    atmosphere.times.forEach((t, i) => atmIndexMap.set(t, i));
+  }
+
+  function computeLight(t: string, kd: number): LightProfile | undefined {
+    if (!atmosphere) return undefined;
+    const idx = atmIndexMap.get(t);
+    if (idx === undefined) return undefined;
+    const sw = atmosphere.shortwave_radiation[idx] ?? 0;
+    const cc = (atmosphere.cloudcover[idx] ?? 50) / 100;
+    const dt = new Date(t);
+    const elev = solarElevation(siteLat, siteLon, dt);
+    return computeLightProfile(sw, elev, cc, kd, SITE_DEPTH_M);
+  }
 
   // -------------------------------------------------------------------------
   // Hiérarchie des sources
@@ -494,6 +520,7 @@ export async function computeClarityTimeseries(
         visibilityM: +visibilityM.toFixed(1),
         source: sources.join(' + '),
         confidence: +Math.min(1, satellite.confidence * (orneResult.confidence)).toFixed(2),
+        light: computeLight(t, kd),
       };
     });
 
@@ -529,6 +556,7 @@ export async function computeClarityTimeseries(
         visibilityM: +visibilityM.toFixed(1),
         source: sources.join(' + '),
         confidence: +Math.min(1, confidence).toFixed(2),
+        light: computeLight(t, kd),
       };
     });
 
@@ -551,6 +579,7 @@ export async function computeClarityTimeseries(
       visibilityM: +visibilityM.toFixed(1),
       source: 'climatologie',
       confidence: 0.30,
+      light: computeLight(t, kd),
     };
   });
 
