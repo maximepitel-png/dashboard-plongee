@@ -84,11 +84,14 @@ export const FACTORS: Record<string, Factor> = {
   },
   clarity: {
     key: 'clarity',
-    label: 'Clarté estimée',
+    label: 'Clarté',
     maxPts: 20,
-    unit: 'mm/h',
+    unit: 'm',
     thresholds: [
-      { below: 0.01, pts: 20 },
+      // Paliers visibilité (m) — utilisés quand la donnée satellite/modèle est disponible
+      // et que la préférence « la visibilité compte dans ma note » est activée.
+      // Plus la valeur est haute, mieux c'est (logique inversée gérée dans scoring.ts).
+      { below: 0.01, pts: 20 }, // inutilisé dans ce mode — conservé pour le mode précip.
       { below: 0.5,  pts: 15 },
       { below: 2,    pts: 8  },
       { below: 5,    pts: 3  },
@@ -97,10 +100,11 @@ export const FACTORS: Record<string, Factor> = {
     favorableBelow: 0.01,
     adverseAbove: 5,
     description:
-      "La visibilité sous-marine est difficile à prévoir directement. " +
-      "On utilise les précipitations de surface comme indicateur indirect : " +
-      "la pluie trouble l'eau côtière et réduit la luminosité. " +
-      "C'est un proxy approximatif — la vraie turbidité dépend aussi des courants et des sédiments.",
+      "La visibilité sous-marine dépend de la turbidité de l'eau : " +
+      "panache de l'Orne, remise en suspension par la houle et phytoplancton. " +
+      "En Manche orientale, la visibilité typique varie de 1 m (forte turbidité) " +
+      "à 8 m (eaux claires). Le proxy par précipitations est utilisé quand la " +
+      "donnée satellite ou le modèle Orne ne sont pas disponibles.",
   },
   current: {
     key: 'current',
@@ -141,6 +145,22 @@ export const FACTORS: Record<string, Factor> = {
       "au-dessus de 16°C une 5 mm suffit pour la plupart des plongeurs.",
   },
 } as const;
+
+/**
+ * Paliers de visibilité (m) pour le scoring de clarté quand la donnée réelle est disponible.
+ * Logique inversée : plus la visibilité est haute, plus le score est élevé.
+ * Usage : scoreVisibilityM(vm) dans scoring.ts
+ */
+export const VISIBILITY_THRESHOLDS: { above: number; pts: number }[] = [
+  { above: 5.0, pts: 20 },  // excellente — eau claire
+  { above: 3.0, pts: 15 },  // bonne
+  { above: 2.0, pts: 8  },  // moyenne
+  { above: 1.5, pts: 3  },  // mauvaise
+  { above: 0,   pts: 0  },  // très mauvaise (<1,5 m)
+];
+
+/** Seuil d'alerte binômage (m) — en dessous, la visibilité est insuffisante */
+export const VISIBILITY_BINOME_ALERT_M = 2.5;
 
 /** Score maximum en mode complet (tous facteurs) */
 export const MAX_SCORE_FULL: number = Object.values(FACTORS).reduce((s, f) => s + f.maxPts, 0);

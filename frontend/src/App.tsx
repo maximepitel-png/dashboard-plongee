@@ -148,7 +148,7 @@ async function fetchSuggestions(input: string): Promise<GeoSuggestion[]> {
 
 const AppInner: React.FC = () => {
   const { selectedSite } = useDiveSites();
-  const { formatWind, formatTemp } = useUnits();
+  const { formatWind, formatTemp, clarityInScore } = useUnits();
 
   // ── Theme (light/dark) ───────────────────────────────────────────────────
   const [isDark, setIsDark] = React.useState<boolean>(() => {
@@ -519,7 +519,7 @@ const AppInner: React.FC = () => {
                   const isSelected = selectedDay === i;
 
                   // Per-day divability score
-                  const dayScore = weather ? computeDayDivabilityScore(d.date, weather, marineHorizonDate) : null;
+                  const dayScore = weather ? computeDayDivabilityScore(d.date, weather, marineHorizonDate, { clarityInScore }) : null;
 
                   // Air temp at noon
                   const noonStr = d.date + 'T12';
@@ -545,9 +545,18 @@ const AppInner: React.FC = () => {
                         <p className={`text-xs font-semibold ${isSelected ? 'text-ocean-300' : 'text-gray-400'}`}>
                           {isToday ? "Auj." : formatDayTab(d.date)}
                         </p>
-                        <span className="text-xs" style={{ color: beyondMarine ? '#4b5563' : getCoefficientColor(d.coefficient) }}>
-                          {d.coefficientIsEstimate ? '~' : ''}C{d.coefficient}
-                        </span>
+                        <div className="flex items-center gap-0.5">
+                          {/* Pictos discrets visibles avant le clic : mauvaise visi ou plongée sombre */}
+                          {dayScore?.lightInfo?.binomeAlert && (
+                            <span title={`Visi ${dayScore.lightInfo.visibilityM.toFixed(1)} m — vigilance binômage`} className="text-xs leading-none opacity-80">👁️</span>
+                          )}
+                          {dayScore?.lightInfo && (dayScore.lightInfo.tier === 'lamp_needed' || dayScore.lightInfo.tier === 'black') && (
+                            <span title="Plongée sombre — lampe conseillée" className="text-xs leading-none opacity-70">🔦</span>
+                          )}
+                          <span className="text-xs" style={{ color: beyondMarine ? '#4b5563' : getCoefficientColor(d.coefficient) }}>
+                            {d.coefficientIsEstimate ? '~' : ''}C{d.coefficient}
+                          </span>
+                        </div>
                       </div>
 
                       {/* ── Collapsible details ── */}

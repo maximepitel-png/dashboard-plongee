@@ -5,7 +5,7 @@
  * Ce fichier ne contient aucune valeur numérique métier.
  */
 
-import { FACTORS, VERDICT_LEVELS, MAX_SCORE_FULL, MAX_SCORE_PARTIAL } from '../scoring/model';
+import { FACTORS, VERDICT_LEVELS, MAX_SCORE_FULL, MAX_SCORE_PARTIAL, VISIBILITY_THRESHOLDS } from '../scoring/model';
 
 export interface DivabilityConditions {
   windKnots: number;
@@ -13,6 +13,10 @@ export interface DivabilityConditions {
   precipitation: number;
   seaTemp: number;
   currentMs: number;
+  /** Visibilité sous-marine (m) issue du modèle Kd ou satellite */
+  visibilityM?: number;
+  /** Source de la donnée de clarté (pour l'affichage) */
+  claritySource?: string;
 }
 
 export interface DivabilityOptions {
@@ -37,6 +41,12 @@ export interface DivabilityOptions {
    */
   daylightBonus?: number;
   currentBonus?: number;
+  /**
+   * Quand true et que conditions.visibilityM est fourni, utilise la visibilité réelle
+   * (m) pour scorer la clarté au lieu du proxy précipitations.
+   * L'obscurité (light tier) n'est jamais prise en compte dans le score.
+   */
+  useVisibilityScore?: boolean;
 }
 
 export interface DivabilityDetail {
@@ -71,6 +81,14 @@ export interface DivabilityResult {
 function scoreStep(value: number, thresholds: { below: number; pts: number }[]): number {
   for (const t of thresholds) {
     if (value < t.below) return t.pts;
+  }
+  return 0;
+}
+
+/** Score de visibilité (logique inversée : plus la valeur est haute, mieux c'est) */
+function scoreVisibilityM(vm: number): number {
+  for (const t of VISIBILITY_THRESHOLDS) {
+    if (vm >= t.above) return t.pts;
   }
   return 0;
 }
@@ -110,16 +128,29 @@ export function computeDivability(
     formatTemp: fmtTemp = (c: number) => `${Math.round(c)}°C`,
     daylightBonus = 0,
     currentBonus = 0,
+    useVisibilityScore = false,
   } = options;
 
-  const { windKnots, waveHeight, precipitation, seaTemp, currentMs } = conditions;
+  const { windKnots, waveHeight, precipitation, seaTemp, currentMs, visibilityM, claritySource } = conditions;
 
   const windEff    = windKnots  / multipliers.wind;
   const waveEff    = waveHeight / multipliers.swell;
   const currentEff = currentMs  / multipliers.current;
 
-  const windScore    = scoreStep(windEff,    FACTORS.wind.thresholds);
-  const clarityScore = scoreStep(precipitation, FACTORS.clarity.thresholds);
+  const windScore = scoreStep(windEff, FACTORS.wind.thresholds);
+
+  // Clarté : visibilité réelle (si préférence activée et donnée disponible) ou proxy précip
+  const useVisi = useVisibilityScore && visibilityM != null;
+  const clarityScore = useVisi
+    ? scoreVisibilityM(visibilityM!)
+    : scoreStep(precipitation, FACTORS.clarity.thresholds);
+
+  const clarityValue = useVisi
+    ? `${visibilityM!.toFixed(1)} m`
+    : (precipitation < 0.01 ? 'Favorable' : `${precipitation.toFixed(1)} mm/h`);
+  const clarityNote = useVisi
+    ? (claritySource ? claritySource : 'modèle Kd')
+    : (isPartial ? 'proxy précip. surface' : 'proxy précip. surface — ≠ visibilité sous-marine');
 
   if (isPartial) {
     const score = windScore + clarityScore;
@@ -140,10 +171,10 @@ export function computeDivability(
         },
         {
           label: FACTORS.clarity.label,
-          value: precipitation < 0.01 ? 'Favorable' : `${precipitation.toFixed(1)} mm/h`,
+          value: clarityValue,
           score: clarityScore,
           maxPts: FACTORS.clarity.maxPts,
-          note: 'proxy précip. surface',
+          note: clarityNote,
         },
       ],
     };
@@ -178,10 +209,10 @@ export function computeDivability(
       },
       {
         label: FACTORS.clarity.label,
-        value: precipitation < 0.01 ? 'Favorable' : `${precipitation.toFixed(1)} mm/h`,
+        value: clarityValue,
         score: clarityScore,
         maxPts: FACTORS.clarity.maxPts,
-        note: 'proxy précip. surface — ≠ visibilité sous-marine',
+        note: clarityNote,
       },
       {
         label: FACTORS.temperature.label,

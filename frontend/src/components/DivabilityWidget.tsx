@@ -6,6 +6,26 @@ import { useSiteAdjustment, getSiteMultipliers } from '../contexts/SiteAdjustmen
 import InfoTooltip from './InfoTooltip';
 import { forecastReliability } from '../utils/forecastReliability';
 import { computeDivability, DivabilityResult } from '../utils/scoring';
+import { VISIBILITY_BINOME_ALERT_M } from '../scoring/model';
+
+interface LightProfile {
+  tier: 'readable' | 'colors_gone' | 'lamp_needed' | 'black';
+  darkDepthM: number;
+  colorLostDepthM: number;
+  irradianceAtDepthLux: number;
+  surfaceIrradianceLux: number;
+  solarElevationDeg: number;
+  visibilityM: number;
+}
+
+interface ClarityPoint {
+  time: string;
+  kd: number;
+  visibilityM: number;
+  source: string;
+  confidence: number;
+  light?: LightProfile;
+}
 
 interface WeatherData {
   current: {
@@ -42,6 +62,8 @@ interface WeatherData {
   };
   daily: { sunrise: string[]; sunset: string[] };
   location: { lat: number; lon: number; name: string };
+  clarity?: ClarityPoint[];
+  lampRequiredAfter?: string | null;
 }
 
 interface TidalImpact {
@@ -50,19 +72,28 @@ interface TidalImpact {
 }
 
 interface Props {
-  selectedDate: string; // "YYYY-MM-DD" ou "" pour aujourd'hui
+  selectedDate: string;
   weather: WeatherData | null;
   marineHorizonDate?: string | null;
 }
 
+// Retourne l'heure locale courte : "08:30"
+function fmtHour(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
 const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizonDate }) => {
-  const { formatWind, formatTemp } = useUnits();
+  const { formatWind, formatTemp, clarityInScore, setClarityInScore } = useUnits();
   const { selectedSite } = useSiteAdjustment();
   const multipliers = getSiteMultipliers(selectedSite);
   const [tidalImpact, setTidalImpact] = useState<TidalImpact | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [score, setScore] = useState<DivabilityResult | null>(null);
+
+  // Clarity point at selected time
+  const [clarityPoint, setClarityPoint] = useState<ClarityPoint | null>(null);
 
   const fetchTidalImpact = useCallback(async (timestamp?: number) => {
     setLoading(true);
@@ -96,9 +127,10 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
     let precipitation: number;
     let seaTemp: number;
     let currentMs: number;
+    let targetTime: string;
 
     if (selectedDate) {
-      const targetTime = new Date(selectedDate + 'T12:00:00').toISOString().slice(0, 13);
+      targetTime = new Date(selectedDate + 'T12:00:00').toISOString().slice(0, 13);
       const hourIdx = weather.hourly.time.findIndex((t) => t >= targetTime);
       const idx = hourIdx >= 0 ? hourIdx : 0;
       windKnots = weather.hourly.windspeed_10m[idx] || 0;
@@ -109,9 +141,10 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
       seaTemp = weather.marine.hourly.sea_surface_temperature[mi] || 12;
       currentMs = weather.marine.hourly.ocean_current_velocity[mi] || 0;
     } else {
+      const now = new Date().toISOString().slice(0, 13);
+      targetTime = now;
       windKnots = weather.current.windspeed;
       precipitation = weather.current.precipitation;
-      const now = new Date().toISOString().slice(0, 13);
       const mi = weather.marine.hourly.time.findIndex((t) => t.startsWith(now));
       const i = mi >= 0 ? mi : 0;
       waveHeight = weather.marine.hourly.wave_height[i] || 0;
@@ -119,12 +152,28 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
       currentMs = weather.marine.hourly.ocean_current_velocity[i] || 0;
     }
 
+    // Find clarity point
+    let cp: ClarityPoint | null = null;
+    if (weather.clarity && weather.clarity.length > 0) {
+      const ci = weather.clarity.findIndex((p) => p.time >= targetTime);
+      cp = ci >= 0 ? weather.clarity[ci] : weather.clarity[weather.clarity.length - 1];
+    }
+    setClarityPoint(cp);
+
     const computed = computeDivability(
-      { windKnots, waveHeight, precipitation, seaTemp, currentMs },
-      { multipliers, formatWind, formatTemp },
+      {
+        windKnots,
+        waveHeight,
+        precipitation,
+        seaTemp,
+        currentMs,
+        visibilityM: cp?.visibilityM,
+        claritySource: cp?.source,
+      },
+      { multipliers, formatWind, formatTemp, useVisibilityScore: clarityInScore },
     );
     setScore(computed);
-  }, [weather, tidalImpact, selectedDate, multipliers]);
+  }, [weather, tidalImpact, selectedDate, multipliers, clarityInScore]);
 
   const dayIndex = React.useMemo(() => {
     if (!selectedDate) return 0;
@@ -142,6 +191,51 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
   const gaugePercentage = score ? score.score : 0;
   const circumference = 2 * Math.PI * 54;
   const strokeDashoffset = circumference - (gaugePercentage / 100) * circumference;
+
+  // ── Bandeau lumière + visibilité ──────────────────────────────────────────
+  const light = clarityPoint?.light ?? null;
+  const visM  = clarityPoint?.visibilityM ?? null;
+
+  function buildBandeau(): { text: string; color: string; icon: string } | null {
+    if (!light && visM == null) return null;
+
+    const parts: string[] = [];
+    let severity: 'ok' | 'warn' | 'danger' = 'ok';
+
+    if (visM != null) {
+      if (visM < VISIBILITY_BINOME_ALERT_M) {
+        parts.push(`visi ${visM.toFixed(1)} m — vigilance binômage`);
+        severity = 'danger';
+      } else {
+        parts.push(`visi ${visM.toFixed(1)} m`);
+      }
+    }
+
+    if (light) {
+      if (light.tier === 'black' || light.tier === 'lamp_needed') {
+        if (light.darkDepthM > 0 && light.darkDepthM < 30) {
+          parts.push(`plongée sombre dès ${light.darkDepthM.toFixed(0)} m — lampe indispensable`);
+          if (severity === 'ok') severity = 'warn';
+        } else if (light.tier === 'black') {
+          parts.push('noir total à cette profondeur — lampe indispensable');
+          if (severity === 'ok') severity = 'warn';
+        }
+      } else if (light.tier === 'colors_gone') {
+        parts.push(`couleurs atténuées dès ${light.colorLostDepthM.toFixed(0)} m`);
+      }
+    }
+
+    if (parts.length === 0) return null;
+
+    const verdictLabel = score?.verdict ?? '';
+    const text = verdictLabel ? `${verdictLabel} · ${parts.join(' — ')}` : parts.join(' — ');
+
+    const color = severity === 'danger' ? '#ef4444' : severity === 'warn' ? '#f59e0b' : '#2dd4bf';
+    const icon  = severity === 'danger' ? '⚠️' : severity === 'warn' ? '🔦' : '👁️';
+    return { text, color, icon };
+  }
+
+  const bandeau = buildBandeau();
 
   return (
     <div className="card">
@@ -246,13 +340,34 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
           >
             {score.verdict}
           </div>
-          <div className="flex items-center gap-2 mb-4">
+
+          {/* Fiabilité */}
+          <div className="flex items-center gap-2 mb-2">
             <span className="text-xs text-gray-500">Fiabilité prévision :</span>
             <div className="flex-1 max-w-24 h-1.5 rounded-full bg-navy-800 overflow-hidden">
               <div className="h-full rounded-full transition-all" style={{ width: `${reliability.pct}%`, backgroundColor: reliability.color }} />
             </div>
             <span className="text-xs font-medium" style={{ color: reliability.color }}>{reliability.label} ({reliability.pct}%)</span>
           </div>
+
+          {/* Bandeau lumière + visibilité */}
+          {bandeau && (
+            <div
+              className="w-full flex items-start gap-2 rounded-lg px-3 py-2 mb-3 text-xs"
+              style={{ backgroundColor: bandeau.color + '18', border: `1px solid ${bandeau.color}44`, color: bandeau.color }}
+            >
+              <span className="shrink-0 mt-0.5">{bandeau.icon}</span>
+              <span className="leading-relaxed">{bandeau.text}</span>
+            </div>
+          )}
+
+          {/* Lampe requise ce soir */}
+          {weather?.lampRequiredAfter && (
+            <p className="text-xs text-amber-400/80 mb-3 flex items-center gap-1">
+              <span>🔦</span>
+              <span>Lampe indispensable après {fmtHour(weather.lampRequiredAfter)}</span>
+            </p>
+          )}
 
           {selectedSite && (
             <p className="text-xs text-ocean-400/70 mb-3 italic">Ajusté pour {selectedSite.name}</p>
@@ -265,7 +380,9 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
               const barColor = d.score >= d.maxPts * 0.7 ? '#2dd4bf' : d.score >= d.maxPts * 0.4 ? '#f59e0b' : '#ef4444';
               const qualLabel = d.score >= d.maxPts * 0.7 ? 'Favorable' : d.score >= d.maxPts * 0.4 ? 'Moyen' : 'Défavorable';
               const labelTooltip: Record<string, string> = {
-                'Clarté estimée': "Proxy basé sur les précipitations en surface. Ne reflète pas directement la visibilité sous l'eau, qui dépend aussi de la turbidité et des sédiments.",
+                'Clarté': clarityPoint
+                  ? `Source : ${clarityPoint.source} (confiance ${Math.round(clarityPoint.confidence * 100)}%). L'obscurité (lumière) n'affecte jamais le score — c'est un choix de préparation, pas une mauvaise condition.`
+                  : "Proxy basé sur les précipitations en surface. Ne reflète pas directement la visibilité sous l'eau.",
                 'Courant': "Vitesse du courant océanique de surface. À l'étale (renverse), le courant est quasi nul pendant ~30 à 90 minutes.",
                 'Temp. mer': "Température de surface de la mer (SST). La température réelle en profondeur peut être de 2 à 5°C plus froide.",
               };
@@ -286,6 +403,27 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
               );
             })}
             <p className="text-xs text-gray-600 mt-1 italic col-span-2">Barre courte = facteur défavorable · Barre pleine = facteur optimal</p>
+          </div>
+
+          {/* Préférence : visibilité dans la note */}
+          <div className="w-full mt-3 pt-3 border-t border-navy-800">
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={clarityInScore}
+                onChange={(e) => setClarityInScore(e.target.checked)}
+                className="w-4 h-4 rounded accent-ocean-400 cursor-pointer"
+              />
+              <span className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors leading-snug">
+                La visibilité compte dans ma note
+                <InfoTooltip text="Quand cette case est cochée, la turbidité réelle de l'eau (modèle Kd + satellite) influe sur le score. L'obscurité (lumière faible en profondeur) n'est jamais pénalisée — plonger dans le noir est un choix de préparation, pas une mauvaise condition." />
+              </span>
+            </label>
+            {clarityInScore && !clarityPoint && (
+              <p className="text-xs text-amber-500/70 mt-1 ml-6 italic">
+                Donnée de clarté non disponible — proxy précipitations utilisé.
+              </p>
+            )}
           </div>
 
           {/* Tidal info */}
@@ -310,6 +448,7 @@ const DivabilityWidget: React.FC<Props> = ({ selectedDate, weather, marineHorizo
           ⚠️ Calcul indicatif — seuils arbitraires. Ne constitue pas une autorisation de mise à l'eau. Consulter MétéoFrance et les tables SHOM.
           {' · '}Source : Open-Meteo + modèle harmonique local · Calculé à {new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
           {' · '}Fiabilité prévision : {reliability.label}
+          {clarityPoint && ` · Clarté : ${clarityPoint.source}`}
         </p>
       )}
     </div>

@@ -3,6 +3,8 @@ import React, { createContext, useContext, useState } from 'react';
 type WindUnit = 'kt' | 'kmh';
 type TempUnit = 'c' | 'f';
 
+const CLARITY_SCORE_KEY = 'dive-dashboard-clarity-score';
+
 interface UnitContextValue {
   windUnit: WindUnit;
   tempUnit: TempUnit;
@@ -10,6 +12,9 @@ interface UnitContextValue {
   setTempUnit: (u: TempUnit) => void;
   formatWind: (kt: number) => string;
   formatTemp: (c: number) => string;
+  /** Préférence : la visibilité réelle compte dans la note (décochée par défaut) */
+  clarityInScore: boolean;
+  setClarityInScore: (v: boolean) => void;
 }
 
 const UnitContext = createContext<UnitContextValue>({
@@ -19,11 +24,21 @@ const UnitContext = createContext<UnitContextValue>({
   setTempUnit: () => {},
   formatWind: (kt) => `${Math.round(kt)} kt`,
   formatTemp: (c) => `${Math.round(c)}°C`,
+  clarityInScore: false,
+  setClarityInScore: () => {},
 });
 
 export const UnitProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [windUnit, setWindUnit] = useState<WindUnit>('kmh');
   const [tempUnit, setTempUnit] = useState<TempUnit>('c');
+  const [clarityInScore, setClarityInScoreState] = useState<boolean>(() => {
+    try { return localStorage.getItem(CLARITY_SCORE_KEY) === 'true'; } catch { return false; }
+  });
+
+  const setClarityInScore = (v: boolean) => {
+    setClarityInScoreState(v);
+    try { localStorage.setItem(CLARITY_SCORE_KEY, String(v)); } catch { /* ignore */ }
+  };
 
   const formatWind = (kt: number): string => {
     if (windUnit === 'kmh') return `${Math.round(kt * 1.852)} km/h`;
@@ -36,7 +51,7 @@ export const UnitProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <UnitContext.Provider value={{ windUnit, tempUnit, setWindUnit, setTempUnit, formatWind, formatTemp }}>
+    <UnitContext.Provider value={{ windUnit, tempUnit, setWindUnit, setTempUnit, formatWind, formatTemp, clarityInScore, setClarityInScore }}>
       {children}
     </UnitContext.Provider>
   );
