@@ -1,14 +1,34 @@
+import { RELIABILITY_TABLE } from '../scoring/model';
+
 export interface ReliabilityInfo {
-  pct: number;       // 0–100
+  pct: number;
   label: string;
   color: string;
 }
 
+const RELIABILITY_COLORS = [
+  '#2dd4bf', // très fiable
+  '#2dd4bf', // fiable
+  '#84cc16', // bonne
+  '#f59e0b', // modérée
+  '#f97316', // faible
+  '#ef4444', // très faible
+];
+
 export function forecastReliability(dayIndex: number): ReliabilityInfo {
-  if (dayIndex <= 1) return { pct: 95, label: 'Très fiable', color: '#2dd4bf' };
-  if (dayIndex <= 3) return { pct: 85, label: 'Fiable', color: '#2dd4bf' };
-  if (dayIndex <= 5) return { pct: 70, label: 'Bonne', color: '#84cc16' };
-  if (dayIndex <= 7) return { pct: 55, label: 'Modérée', color: '#f59e0b' };
-  if (dayIndex <= 10) return { pct: 35, label: 'Faible', color: '#f97316' };
-  return { pct: 20, label: 'Très faible', color: '#ef4444' };
+  for (let i = 0; i < RELIABILITY_TABLE.length; i++) {
+    if (dayIndex <= RELIABILITY_TABLE[i].maxDays) {
+      return {
+        pct: Math.round(RELIABILITY_TABLE[i].reliability * 100),
+        label: RELIABILITY_TABLE[i].label,
+        color: RELIABILITY_COLORS[i] ?? '#ef4444',
+      };
+    }
+  }
+  const last = RELIABILITY_TABLE[RELIABILITY_TABLE.length - 1];
+  return {
+    pct: Math.round(last.reliability * 100),
+    label: last.label,
+    color: RELIABILITY_COLORS[RELIABILITY_TABLE.length - 1] ?? '#ef4444',
+  };
 }
